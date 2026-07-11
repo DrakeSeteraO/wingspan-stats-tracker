@@ -1,0 +1,184 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Wingspan field-guide design system.
+ * Light: parchment, eggshell blue, sage green, warm brown.
+ * Dark: nighttime forest — deep mossy green-blues, moonlit accents.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --font-serif: "Lora", Georgia, serif;
+  --font-sans: "Nunito Sans", system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-parchment: var(--parchment);
+  --color-moss: var(--moss);
+  --color-egg: var(--egg);
+  --color-bark: var(--bark);
+  --color-nectar: var(--nectar);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --shadow-feather: var(--shadow-feather);
+  --shadow-nest: var(--shadow-nest);
+}
+
+:root {
+  --radius: 0.75rem;
+  /* Parchment & eggshell */
+  --background: oklch(0.972 0.012 92);
+  --foreground: oklch(0.31 0.03 60);
+  --card: oklch(0.988 0.008 95);
+  --card-foreground: oklch(0.31 0.03 60);
+  --popover: oklch(0.988 0.008 95);
+  --popover-foreground: oklch(0.31 0.03 60);
+  /* Sage green */
+  --primary: oklch(0.52 0.07 145);
+  --primary-foreground: oklch(0.98 0.008 95);
+  /* Eggshell blue */
+  --secondary: oklch(0.9 0.03 210);
+  --secondary-foreground: oklch(0.36 0.05 220);
+  --muted: oklch(0.93 0.015 90);
+  --muted-foreground: oklch(0.5 0.03 70);
+  /* Warm honey accent */
+  --accent: oklch(0.9 0.05 85);
+  --accent-foreground: oklch(0.38 0.06 65);
+  --destructive: oklch(0.55 0.16 30);
+  --destructive-foreground: oklch(0.98 0.008 95);
+  --border: oklch(0.87 0.02 85);
+  --input: oklch(0.87 0.02 85);
+  --ring: oklch(0.52 0.07 145);
+  --chart-1: oklch(0.52 0.07 145);  /* sage */
+  --chart-2: oklch(0.62 0.08 230);  /* slate blue */
+  --chart-3: oklch(0.6 0.11 55);    /* terracotta */
+  --chart-4: oklch(0.72 0.1 85);    /* goldenrod */
+  --chart-5: oklch(0.55 0.06 320);  /* dusky plum */
+  --parchment: oklch(0.955 0.015 90);
+  --moss: oklch(0.45 0.06 140);
+  --egg: oklch(0.87 0.04 215);
+  --bark: oklch(0.42 0.05 60);
+  --nectar: oklch(0.78 0.11 80);
+  --sidebar: oklch(0.955 0.015 90);
+  --sidebar-foreground: oklch(0.31 0.03 60);
+  --sidebar-primary: oklch(0.52 0.07 145);
+  --sidebar-primary-foreground: oklch(0.98 0.008 95);
+  --sidebar-accent: oklch(0.9 0.05 85);
+  --sidebar-accent-foreground: oklch(0.38 0.06 65);
+  --sidebar-border: oklch(0.87 0.02 85);
+  --sidebar-ring: oklch(0.52 0.07 145);
+  --shadow-feather: 0 2px 12px -2px oklch(0.42 0.05 60 / 0.12);
+  --shadow-nest: 0 12px 40px -12px oklch(0.42 0.05 60 / 0.22);
+  --gradient-canopy: linear-gradient(160deg, oklch(0.94 0.03 145 / 0.5), oklch(0.93 0.03 210 / 0.4));
+}
+
+.dark {
+  /* Nighttime forest */
+  --background: oklch(0.22 0.025 160);
+  --foreground: oklch(0.9 0.02 100);
+  --card: oklch(0.26 0.028 165);
+  --card-foreground: oklch(0.9 0.02 100);
+  --popover: oklch(0.26 0.028 165);
+  --popover-foreground: oklch(0.9 0.02 100);
+  /* Moonlit sage */
+  --primary: oklch(0.72 0.08 150);
+  --primary-foreground: oklch(0.2 0.025 160);
+  --secondary: oklch(0.32 0.035 200);
+  --secondary-foreground: oklch(0.88 0.03 210);
+  --muted: oklch(0.29 0.025 165);
+  --muted-foreground: oklch(0.7 0.02 120);
+  --accent: oklch(0.36 0.045 90);
+  --accent-foreground: oklch(0.9 0.06 90);
+  --destructive: oklch(0.62 0.14 30);
+  --destructive-foreground: oklch(0.95 0.01 90);
+  --border: oklch(0.34 0.025 160);
+  --input: oklch(0.34 0.025 160);
+  --ring: oklch(0.72 0.08 150);
+  --chart-1: oklch(0.72 0.08 150);
+  --chart-2: oklch(0.7 0.08 230);
+  --chart-3: oklch(0.68 0.1 55);
+  --chart-4: oklch(0.78 0.1 85);
+  --chart-5: oklch(0.66 0.07 320);
+  --parchment: oklch(0.25 0.025 160);
+  --moss: oklch(0.62 0.07 145);
+  --egg: oklch(0.42 0.04 215);
+  --bark: oklch(0.68 0.04 70);
+  --nectar: oklch(0.75 0.1 85);
+  --sidebar: oklch(0.25 0.025 160);
+  --sidebar-foreground: oklch(0.9 0.02 100);
+  --sidebar-primary: oklch(0.72 0.08 150);
+  --sidebar-primary-foreground: oklch(0.2 0.025 160);
+  --sidebar-accent: oklch(0.36 0.045 90);
+  --sidebar-accent-foreground: oklch(0.9 0.06 90);
+  --sidebar-border: oklch(0.34 0.025 160);
+  --sidebar-ring: oklch(0.72 0.08 150);
+  --shadow-feather: 0 2px 12px -2px oklch(0.1 0.02 160 / 0.5);
+  --shadow-nest: 0 12px 40px -12px oklch(0.08 0.02 160 / 0.7);
+  --gradient-canopy: linear-gradient(160deg, oklch(0.28 0.035 160 / 0.6), oklch(0.26 0.03 220 / 0.5));
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    transition: background-color 0.4s ease, color 0.4s ease;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-serif);
+  }
+}
+
+@utility watercolor-wash {
+  background-image: var(--gradient-canopy);
+}
+
+@utility field-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-feather);
+}
