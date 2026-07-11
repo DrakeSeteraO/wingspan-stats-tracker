@@ -1,0 +1,8 @@
+# Ignore environment variables and secrets
+.env
+
+# Python env
+.venv
+
+# Ignore the entire wingspan directory and all its contents
+Wingspan/
