@@ -126,6 +126,23 @@ function TrendsPage() {
     });
   }, [liveGames, metric]);
 
+  const activePlayers = useMemo(() => {
+    const names = new Set<string>();
+    liveGames.forEach((game) => {
+      game.results.forEach((r) => names.add(r.player));
+    });
+    return Array.from(names);
+  }, [liveGames]);
+
+  // A dynamic color palette to replace the hardcoded mock colors
+  const colorPalette = [
+    "var(--chart-1)",
+    "var(--chart-2)",
+    "var(--chart-3)",
+    "var(--chart-4)",
+    "var(--chart-5)",
+  ];
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -189,12 +206,12 @@ function TrendsPage() {
                 <Legend
                   wrapperStyle={{ fontFamily: "Nunito Sans, sans-serif", fontSize: 13 }}
                 />
-                {players.map((p) => (
+                {activePlayers.map((p, index) => (
                   <Line
                     key={p}
                     type="monotone"
                     dataKey={p}
-                    stroke={playerColors[p]}
+                    stroke={colorPalette[index % colorPalette.length]}
                     strokeWidth={2.5}
                     dot={{ r: 4, strokeWidth: 2, fill: "var(--card)" }}
                     activeDot={{ r: 6 }}
