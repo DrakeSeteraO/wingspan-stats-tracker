@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Azure SQL Configuration (Powered by .env) ---
-load_dotenv()
 SERVER = os.getenv('SERVER')
 DATABASE = os.getenv('DATABASE')
 USERNAME = os.getenv('UPLOAD_USERNAME')
@@ -18,6 +17,9 @@ DRIVER = os.getenv('DRIVER')
 
 # File Paths
 WINGSPAN_DOCS_DIR = Path("Wingspan/Container/Documents")
+
+# UPDATE THIS to match the exact name of your settings file
+SETTINGS_FILE_PATH = WINGSPAN_DOCS_DIR / "Settings.json" 
 
 def get_db_connection():
     """Establish a connection to the Azure SQL Database."""
@@ -34,6 +36,24 @@ def update_azure_data():
         print("⚠️ No game history files found.")
         return
 
+    # 1. Load the true timestamps from the Settings file
+    true_game_dates = {}
+    if SETTINGS_FILE_PATH.exists():
+        with open(SETTINGS_FILE_PATH, "r", encoding="utf-8") as sf:
+            settings_data = json.load(sf)
+            for archive in settings_data.get("ArchivedGameSaves", []):
+                match_id_full = archive.get("MatchId", "")
+                # Extract just the UUID prefix (e.g., "d582585b-e59f-4b4a-a4bf-e0d7888924dc")
+                base_id = match_id_full.split('.')[0] 
+                played_ts = archive.get("GamePlayedDate")
+                
+                if base_id and played_ts:
+                    # Convert the Unix timestamp to a SQL-friendly datetime string
+                    true_game_dates[base_id] = datetime.fromtimestamp(played_ts).strftime('%Y-%m-%d %H:%M:%S')
+        print(f"📖 Loaded {len(true_game_dates)} exact game dates from settings.")
+    else:
+        print(f"⚠️ Settings file not found at {SETTINGS_FILE_PATH}. Will fallback to file properties.")
+
     print("🔌 Connecting to Azure SQL for Data Correction...")
     try:
         conn = get_db_connection()
@@ -45,15 +65,20 @@ def update_azure_data():
 
     for file_path in match_files:
         try:
-            mtime = os.path.getmtime(file_path)
-            game_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-
             with open(file_path, "r", encoding="utf-8") as f:
                 game_data = json.load(f)
 
-            # Assuming the filename format is something like UUID.nakama-0
+            # Isolate the UUID from the filename (e.g., UUID.nakama-0)
             temp_id = file_path.name.split('.')[0] 
             game_id = game_data.get("MatchId", temp_id)
+            
+            # 2. Get the true date from our dictionary, or fallback to file modified time
+            if temp_id in true_game_dates:
+                game_date = true_game_dates[temp_id]
+            else:
+                mtime = os.path.getmtime(file_path)
+                game_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+                print(f"⚠️  Missing true date for {game_id}, falling back to file extraction time.")
 
             players = game_data.get("Players", [])
             scores = game_data.get("Scores", [])
@@ -78,7 +103,7 @@ def update_azure_data():
                     UPDATE player_info 
                     SET username = ? 
                     WHERE player_id = ?
-                """, ( p_username, p_id))
+                """, (p_username, p_id))
 
             # ---------------------------------------------------------
             # UPDATE Game
@@ -88,10 +113,6 @@ def update_azure_data():
                 SET date = ?, player_count = ?, winner_id = ? 
                 WHERE game_id = ?
             """, (game_date, len(players), winner_id, game_id))
-
-            # Note: The 'extension' table ONLY contains primary keys (game_id, extension_name).
-            # Because there are no other columns to update, we completely skip it here. 
-            # If a row exists, it's already correct. If it doesn't, an UPDATE wouldn't fix it anyway.
 
             # ---------------------------------------------------------
             # UPDATE Player Game Stats
@@ -117,7 +138,7 @@ def update_azure_data():
 
             # Commit the transaction to save the updates for this file
             conn.commit()
-            print(f"🔄 Corrected Data for Game: {game_id}")
+            print(f"🔄 Corrected Data for Game: {game_id} (Date: {game_date})")
 
         except (json.JSONDecodeError, KeyError):
             print(f"⚠️ Skipping {file_path.name}: Invalid JSON or missing structural keys.")
