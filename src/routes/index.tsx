@@ -44,7 +44,7 @@ const scoreOptions = [
   { value: "total", label: "Total" },
   { value: "bird", label: "Bird" },
   { value: "bonus_card", label: "Bonus Card" },
-  { value: "goals", label: "End of Round Goals" },
+  { value: "end_of_round_goals", label: "End of Round Goals" },
   { value: "eggs", label: "Eggs" },
   { value: "food", label: "Food on Cards" },
   { value: "tucked", label: "Tucked Cards" },

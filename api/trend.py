@@ -38,6 +38,7 @@ def get_stats(request: StatsRequest):
         'total': 'total',
         'bird': 'bird',
         'bonus_card': 'bonus_card',
+        'end_of_round_goals':'end_of_round_goals',
         'eggs': 'eggs',
         'food': 'food_on_cards',
         'tucked': 'tucked_cards',
