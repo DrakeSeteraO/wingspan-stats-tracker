@@ -104,9 +104,17 @@ function TrendsPage() {
     fetchStats();
   }, [metric]);
 
+const activePlayers = useMemo(() => {
+    const names = new Set<string>();
+    liveGames.forEach((game) => {
+      game.results.forEach((r) => names.add(r.player));
+    });
+    return Array.from(names);
+  }, [liveGames]);
+
   const chartData = useMemo(() => {
-    return liveGames.map((game) => {
-      // Determine if the backend returned an integer sequence (game) or a date string (day/month)
+    // 1. Build the base data rows
+    const baseData = liveGames.map((game) => {
       let displayDate = String(game.date);
       if (displayDate.includes("-")) {
         displayDate = formatDate(displayDate);
@@ -117,22 +125,44 @@ function TrendsPage() {
       const row: Record<string, string | number> = { date: displayDate };
       
       for (const r of game.results) {
-        // The Python backend outputs 'totalPoints' for total, and 'nectar' for nectar.
         const valueKey = metric === "nectarPoints" ? "nectar" : "totalPoints";
-        // Cast as any because GameRecord types are strict, but backend output is dynamic
         row[r.player] = (r as any)[valueKey] || 0; 
       }
       return row;
     });
-  }, [liveGames, metric]);
 
-  const activePlayers = useMemo(() => {
-    const names = new Set<string>();
-    liveGames.forEach((game) => {
-      game.results.forEach((r) => names.add(r.player));
+    // 2. Calculate Linear Regression (Line of Best Fit) for each player
+    activePlayers.forEach((player) => {
+      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      let count = 0;
+
+      // Gather stats for the math
+      baseData.forEach((row, x) => {
+        const y = row[player] as number | undefined;
+        if (y !== undefined) {
+          sumX += x;
+          sumY += y;
+          sumXY += x * y;
+          sumXX += x * x;
+          count++;
+        }
+      });
+
+      // Calculate slope (m) and intercept (b)
+      if (count > 1) {
+        const m = (count * sumXY - sumX * sumY) / (count * sumXX - sumX * sumX);
+        const b = (sumY - m * sumX) / count;
+
+        // Apply the newly calculated trendline points to the data object
+        baseData.forEach((row, x) => {
+          row[`${player}_trend`] = Math.round((m * x + b) * 10) / 10;
+        });
+      }
     });
-    return Array.from(names);
-  }, [liveGames]);
+
+    return baseData;
+  }, [liveGames, metric, activePlayers]);
+
 
   // A dynamic color palette to replace the hardcoded mock colors
   const colorPalette = [
@@ -206,16 +236,36 @@ function TrendsPage() {
                 <Legend
                   wrapperStyle={{ fontFamily: "Nunito Sans, sans-serif", fontSize: 13 }}
                 />
+                {/* Real Data Lines */}
                 {activePlayers.map((p, index) => (
                   <Line
                     key={p}
                     type="monotone"
                     dataKey={p}
+                    name={p}
                     stroke={colorPalette[index % colorPalette.length]}
                     strokeWidth={2.5}
                     dot={{ r: 4, strokeWidth: 2, fill: "var(--card)" }}
                     activeDot={{ r: 6 }}
                     animationDuration={700}
+                  />
+                ))}
+
+                {/* Dotted Trend Lines */}
+                {activePlayers.map((p, index) => (
+                  <Line
+                    key={`${p}_trend`}
+                    type="linear"
+                    dataKey={`${p}_trend`}
+                    name={`${p} Trend`}
+                    stroke={colorPalette[index % colorPalette.length]}
+                    strokeWidth={2}
+                    strokeDasharray="5 5" // Makes it dotted
+                    dot={false} // Removes the points on the trendline
+                    activeDot={false} // Stops the user from hovering directly on the trendline
+                    legendType="none" // Hides the extra lines from the legend
+                    animationDuration={700}
+                    opacity={0.4} // Fades it into the background
                   />
                 ))}
               </LineChart>
