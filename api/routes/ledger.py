@@ -20,7 +20,7 @@ USERNAME = os.getenv('API_USERNAME')
 PASSWORD = os.getenv('API_PASSWORD')
 
 # Stack the root route to handle Vercel's file-based routing strip
-@router.get("/api/ledger", response_model=List[LedgerData])
+@router.get("/api/ledger", response_model=List[LedgerData], response_model_exclude_none=True)
 def get_ledger():
     
     sql_query = f"""

@@ -20,7 +20,7 @@ USERNAME = os.getenv('API_USERNAME')
 PASSWORD = os.getenv('API_PASSWORD')
 
 # Stack the root route to handle Vercel's file-based routing strip
-@router.post("/api/trend", response_model=List[TrendRecord])
+@router.post("/api/trend", response_model=List[TrendRecord], response_model_exclude_none=True)
 def get_stats(request: TrendRequest):
     
     # Security Allowlists
