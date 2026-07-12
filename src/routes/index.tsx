@@ -12,7 +12,15 @@ import {
 } from "recharts";
 import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { MetricSelect } from "../components/MetricSelect";
-import { playerColors, players, type GameRecord } from "../data/mockData";
+import { players, type GameRecord } from "../data/mockData";
+import { Switch } from "@/components/ui/switch";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ChevronDown } from "lucide-react";
 import { getApiUrl } from "@/lib/api-config";
 
 export const Route = createFileRoute("/")({
@@ -33,19 +41,31 @@ export const Route = createFileRoute("/")({
   component: TrendsPage,
 });
 
-type Metric = "totalPoints" | "nectarPoints" | "avgPerDay";
-
-const metricOptions = [
-  { value: "totalPoints", label: "Total Points" },
-  { value: "nectarPoints", label: "Nectar Points per Game" },
-  { value: "avgPerDay", label: "Average Total Points per Day" },
+const scoreOptions = [
+  { value: "total", label: "Total" },
+  { value: "bird", label: "Bird" },
+  { value: "bonus_card", label: "Bonus Card" },
+  { value: "goals", label: "End of Round Goals" },
+  { value: "eggs", label: "Eggs" },
+  { value: "food", label: "Food on Cards" },
+  { value: "tucked", label: "Tucked Cards" },
+  { value: "nectar", label: "Nectar" },
 ];
 
-const metricDescriptions: Record<Metric, string> = {
-  totalPoints: "Each player's final score, game by game.",
-  nectarPoints: "Nectar collected per game — the Oceania expansion currency.",
-  avgPerDay: "The average total points scored by each player on a given day.",
-};
+const intervalOptions = [
+  { value: "game", label: "Individual Game" },
+  { value: "day", label: "Day" },
+  { value: "month", label: "Month" },
+  { value: "year", label: "Year" },
+  { value: "all", label: "All Time" },
+];
+
+const handlerOptions = [
+  { value: "sum", label: "Sum" },
+  { value: "avg", label: "Avg" },
+  { value: "max", label: "Max" },
+  { value: "min", label: "Min" },
+];
 
 function formatDate(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
@@ -55,37 +75,33 @@ function formatDate(iso: string) {
 }
 
 function TrendsPage() {
-  const [metric, setMetric] = useState<Metric>("totalPoints");
+  const [score, setScore] = useState<string>("total");
+  const [interval, setInterval] = useState<string>("game");
+  const [handler, setHandler] = useState<string>("sum");
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]); // [] = All
+  const [showTrend, setShowTrend] = useState<boolean>(true);
   
   // New API State Management
   const [liveGames, setLiveGames] = useState<GameRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch data whenever the dropdown metric changes
+  // Fetch data whenever any filter changes
   useEffect(() => {
     const fetchStats = async () => {
       setIsLoading(true);
       setError(null);
       
       try {
-        // Map frontend dropdown selections to backend SQL parameters
-        let score = "total";
-        let interval = "game";
-        let handler = "sum";
-
-        if (metric === "nectarPoints") {
-          score = "nectar";
-        } else if (metric === "avgPerDay") {
-          score = "total";
-          interval = "day";
-          handler = "avg";
-        }
-
         const response = await fetch(getApiUrl("/api/trend"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ score, interval, handler, players: [] }), // Empty array fetches all players
+          body: JSON.stringify({
+            score,
+            interval,
+            handler,
+            players: selectedPlayers, // [] means all players (backend contract)
+          }),
         });
 
         if (!response.ok) {
@@ -103,7 +119,7 @@ function TrendsPage() {
     };
 
     fetchStats();
-  }, [metric]);
+  }, [score, interval, handler, selectedPlayers]);
 
 const activePlayers = useMemo(() => {
     const names = new Set<string>();
@@ -126,8 +142,10 @@ const activePlayers = useMemo(() => {
       const row: Record<string, string | number> = { date: displayDate };
       
       for (const r of game.results) {
-        const valueKey = metric === "nectarPoints" ? "nectar" : "totalPoints";
-        row[r.player] = (r as any)[valueKey] || 0; 
+        // Backend returns { player, <metricKey>: value } where metricKey is
+        // "totalPoints" when score === "total", otherwise the raw score name.
+        const valueKey = score === "total" ? "totalPoints" : score;
+        row[r.player] = (r as any)[valueKey] ?? 0;
       }
       return row;
     });
@@ -162,7 +180,7 @@ const activePlayers = useMemo(() => {
     });
 
     return baseData;
-  }, [liveGames, metric, activePlayers]);
+  }, [liveGames, score, activePlayers]);
 
 
   // A dynamic color palette to replace the hardcoded mock colors
@@ -173,6 +191,25 @@ const activePlayers = useMemo(() => {
     "var(--chart-4)",
     "var(--chart-5)",
   ];
+
+  const allPlayersSelected = selectedPlayers.length === 0;
+  const togglePlayer = (name: string) => {
+    setSelectedPlayers((prev) =>
+      prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name],
+    );
+  };
+  const playersLabel = allPlayersSelected
+    ? "All players"
+    : selectedPlayers.length === 1
+      ? selectedPlayers[0]
+      : `${selectedPlayers.length} selected`;
+
+  const currentScoreLabel =
+    scoreOptions.find((o) => o.value === score)?.label ?? score;
+  const currentHandlerLabel =
+    handlerOptions.find((o) => o.value === handler)?.label ?? handler;
+  const currentIntervalLabel =
+    intervalOptions.find((o) => o.value === interval)?.label ?? interval;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -187,18 +224,84 @@ const activePlayers = useMemo(() => {
             to trace how each member of the flock has fared.
           </p>
         </div>
-        <MetricSelect
-          label="Chart metric"
-          value={metric}
-          options={metricOptions}
-          onChange={(v) => setMetric(v as Metric)}
-        />
+      </div>
+
+      {/* Control panel */}
+      <div className="field-card mt-8 p-4 sm:p-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricSelect
+            label="Score"
+            value={score}
+            options={scoreOptions}
+            onChange={setScore}
+          />
+          <MetricSelect
+            label="Interval"
+            value={interval}
+            options={intervalOptions}
+            onChange={setInterval}
+          />
+          <MetricSelect
+            label="Handler"
+            value={handler}
+            options={handlerOptions}
+            onChange={setHandler}
+          />
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Players
+            </span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex w-full items-center justify-between rounded-full border border-border bg-card py-2.5 pl-5 pr-4 text-sm font-semibold text-card-foreground shadow-feather outline-none transition-colors hover:border-ring focus:border-ring"
+                >
+                  <span className="truncate">{playersLabel}</span>
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-primary" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-56 p-2">
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+                  <Checkbox
+                    checked={allPlayersSelected}
+                    onCheckedChange={() => setSelectedPlayers([])}
+                  />
+                  <span className="text-sm font-semibold">All players</span>
+                </label>
+                <div className="my-1 h-px bg-border" />
+                {players.map((p) => (
+                  <label
+                    key={p}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted"
+                  >
+                    <Checkbox
+                      checked={selectedPlayers.includes(p)}
+                      onCheckedChange={() => togglePlayer(p)}
+                    />
+                    <span className="text-sm">{p}</span>
+                  </label>
+                ))}
+              </PopoverContent>
+            </Popover>
+          </label>
+        </div>
+
+        <div className="mt-5 flex items-center justify-between gap-4 border-t border-border pt-4">
+          <p className="font-serif text-sm italic text-muted-foreground">
+            {currentHandlerLabel} of {currentScoreLabel.toLowerCase()} by{" "}
+            {currentIntervalLabel.toLowerCase()}.
+          </p>
+          <label className="flex cursor-pointer items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Trend line
+            </span>
+            <Switch checked={showTrend} onCheckedChange={setShowTrend} />
+          </label>
+        </div>
       </div>
 
       <div className="field-card mt-8 p-4 sm:p-8">
-        <p className="mb-6 font-serif text-sm italic text-muted-foreground">
-          {metricDescriptions[metric]}
-        </p>
         <div className="h-90 w-full min-h-[300px]">
           {isLoading ? (
             <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -253,7 +356,7 @@ const activePlayers = useMemo(() => {
                 ))}
 
                 {/* Dotted Trend Lines */}
-                {activePlayers.map((p, index) => (
+                {showTrend && activePlayers.map((p, index) => (
                   <Line
                     key={`${p}_trend`}
                     type="linear"
