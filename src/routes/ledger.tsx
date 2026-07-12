@@ -99,8 +99,8 @@ function LedgerPage() {
                 <th className="px-4 py-4 text-right">Wins</th>
                 <th className="hidden px-4 py-4 text-right sm:table-cell">Games</th>
                 <th className="px-4 py-4 text-right">Win Rate</th>
-                <th className="hidden px-4 py-4 text-right sm:table-cell">Avg Points</th>
-                <th className="hidden px-4 py-4 text-right md:table-cell">Total Eggs</th>
+                <th className="hidden px-4 py-4 text-right sm:table-cell">Avg Score</th>
+                <th className="hidden px-4 py-4 text-right md:table-cell">Total Score</th>
               </tr>
             </thead>
             <tbody>

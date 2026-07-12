@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import pymssql
@@ -7,19 +7,9 @@ import sys
 from dotenv import load_dotenv
 
 # Import your Pydantic model from the schema.py file in the root directory
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from schema import TrendRequest, TrendRecord
 
-app = FastAPI()
-
-# This allows your React frontend on port 8080 (or 3000) to talk to this Python server on port 8000
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # In production, you would replace "*" with your actual Vercel domain
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+router = APIRouter()
 
 load_dotenv()
 
@@ -30,7 +20,7 @@ USERNAME = os.getenv('API_USERNAME')
 PASSWORD = os.getenv('API_PASSWORD')
 
 # Stack the root route to handle Vercel's file-based routing strip
-@app.post("/api/trend", response_model=List[TrendRecord])
+@router.post("/api/trend", response_model=List[TrendRecord])
 def get_stats(request: TrendRequest):
     
     # Security Allowlists
