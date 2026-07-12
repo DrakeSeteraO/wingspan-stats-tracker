@@ -21,11 +21,11 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      aria-label={dark ? "Switch to daytime meadow" : "Switch to nighttime forest"}
+      aria-label={dark ? "Switch to day meadow" : "Switch to night forest"}
       className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-secondary px-4 text-sm font-semibold text-secondary-foreground transition-all hover:shadow-feather"
     >
       {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-      <span className="hidden sm:inline">{dark ? "Daytime" : "Nighttime"}</span>
+      <span className="hidden sm:inline">{dark ? "Day" : "Night"}</span>
     </button>
   );
 }
