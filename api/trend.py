@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import pymssql
 import os
 import sys
@@ -9,6 +10,16 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from schema import StatsRequest
 
 app = FastAPI()
+
+# This allows your React frontend on port 8080 (or 3000) to talk to this Python server on port 8000
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, you would replace "*" with your actual Vercel domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 load_dotenv()
 
 # --- Azure SQL Configuration ---
