@@ -13,6 +13,7 @@ import {
 import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { MetricSelect } from "../components/MetricSelect";
 import { playerColors, players, type GameRecord } from "../data/mockData";
+import { getApiUrl } from "@/lib/api-config";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -81,7 +82,7 @@ function TrendsPage() {
           handler = "avg";
         }
 
-        const response = await fetch("http://localhost:8000/api/trend", {
+        const response = await fetch(getApiUrl("/api/trend"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ score, interval, handler, players: [] }), // Empty array fetches all players
