@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List
 import pymssql
 import os
 import sys
@@ -7,7 +8,7 @@ from dotenv import load_dotenv
 
 # Import your Pydantic model from the schema.py file in the root directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from schema import StatsRequest
+from schema import TrendRequest, TrendRecord
 
 app = FastAPI()
 
@@ -29,9 +30,8 @@ USERNAME = os.getenv('API_USERNAME')
 PASSWORD = os.getenv('API_PASSWORD')
 
 # Stack the root route to handle Vercel's file-based routing strip
-@app.post("/api/trend")
-@app.post("/")
-def get_stats(request: StatsRequest):
+@app.post("/api/trend", response_model=List[TrendRecord])
+def get_stats(request: TrendRequest):
     
     # Security Allowlists
     allowed_scores = {
