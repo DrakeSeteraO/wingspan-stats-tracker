@@ -28,3 +28,14 @@ class TrendRecord(BaseModel):
     # Union allows the date to be an ISO string ("2026-07-12") or an integer ID for individual games
     date: Union[str, int]
     results: List[PlayerStat]
+
+
+class LedgerData(BaseModel):
+    name: str = "Unknown"
+    username: str = "Unknown"
+    games: int = 0
+    average: float = 0.0
+    total: int = 0
+    wins: int = 0
+    win_rate: float = 0.0
+        
