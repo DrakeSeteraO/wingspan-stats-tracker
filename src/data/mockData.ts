@@ -27,6 +27,40 @@ export const playerColors: Record<string, string> = {
   Jay: "var(--chart-2)",
 };
 
+// Define the parameters your Python backend expects
+export interface TrendRequestParams {
+  score: string;
+  interval: string;
+  handler: string;
+  players: string[];
+}
+
+export const fetchTrendData = async (params: TrendRequestParams): Promise<GameRecord[]> => {
+  try {
+    const response = await fetch("http://localhost:8000/api/trend", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      // Pass the dynamic parameters to the backend
+      body: JSON.stringify(params), 
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Failed to fetch trend data");
+    }
+
+    // The backend returns the exact GameRecord[] structure!
+    const data: GameRecord[] = await response.json();
+    return data;
+    
+  } catch (error) {
+    console.error("API Error:", error);
+    throw error;
+  }
+};
+
 export const games: GameRecord[] = [
   {
     id: 1,

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { MetricSelect } from "../components/MetricSelect";
-import { games, playerColors, players } from "../data/mockData";
+import { playerColors, players, type GameRecord } from "../data/mockData";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -43,7 +43,7 @@ const metricOptions = [
 const metricDescriptions: Record<Metric, string> = {
   totalPoints: "Each player's final score, game by game.",
   nectarPoints: "Nectar collected per game — the Oceania expansion currency.",
-  avgPerDay: "Running average of each player's total points across game days.",
+  avgPerDay: "The average total points scored by each player on a given day.",
 };
 
 function formatDate(iso: string) {
@@ -55,24 +55,76 @@ function formatDate(iso: string) {
 
 function TrendsPage() {
   const [metric, setMetric] = useState<Metric>("totalPoints");
+  
+  // New API State Management
+  const [liveGames, setLiveGames] = useState<GameRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch data whenever the dropdown metric changes
+  useEffect(() => {
+    const fetchStats = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Map frontend dropdown selections to backend SQL parameters
+        let score = "total";
+        let interval = "game";
+        let handler = "sum";
+
+        if (metric === "nectarPoints") {
+          score = "nectar";
+        } else if (metric === "avgPerDay") {
+          score = "total";
+          interval = "day";
+          handler = "avg";
+        }
+
+        const response = await fetch("http://localhost:8000/api/trend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ score, interval, handler, players: [] }), // Empty array fetches all players
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || "Failed to fetch flock data");
+        }
+
+        const data = await response.json();
+        setLiveGames(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An unknown error occurred");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [metric]);
 
   const chartData = useMemo(() => {
-    const running: Record<string, { sum: number; n: number }> = {};
-    return games.map((game) => {
-      const row: Record<string, string | number> = { date: formatDate(game.date) };
+    return liveGames.map((game) => {
+      // Determine if the backend returned an integer sequence (game) or a date string (day/month)
+      let displayDate = String(game.date);
+      if (displayDate.includes("-")) {
+        displayDate = formatDate(displayDate);
+      } else {
+        displayDate = `Game ${displayDate}`;
+      }
+
+      const row: Record<string, string | number> = { date: displayDate };
+      
       for (const r of game.results) {
-        if (metric === "avgPerDay") {
-          const acc = (running[r.player] ??= { sum: 0, n: 0 });
-          acc.sum += r.totalPoints;
-          acc.n += 1;
-          row[r.player] = Math.round((acc.sum / acc.n) * 10) / 10;
-        } else {
-          row[r.player] = r[metric];
-        }
+        // The Python backend outputs 'totalPoints' for total, and 'nectar' for nectar.
+        const valueKey = metric === "nectarPoints" ? "nectar" : "totalPoints";
+        // Cast as any because GameRecord types are strict, but backend output is dynamic
+        row[r.player] = (r as any)[valueKey] || 0; 
       }
       return row;
     });
-  }, [metric]);
+  }, [liveGames, metric]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -99,49 +151,59 @@ function TrendsPage() {
         <p className="mb-6 font-serif text-sm italic text-muted-foreground">
           {metricDescriptions[metric]}
         </p>
-        <div className="h-90 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="4 6" stroke="var(--border)" />
-              <XAxis
-                dataKey="date"
-                stroke="var(--muted-foreground)"
-                tick={{ fontSize: 12, fontFamily: "Nunito Sans, sans-serif" }}
-                tickLine={false}
-              />
-              <YAxis
-                stroke="var(--muted-foreground)"
-                tick={{ fontSize: 12, fontFamily: "Nunito Sans, sans-serif" }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--popover)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "0.75rem",
-                  fontFamily: "Nunito Sans, sans-serif",
-                  fontSize: 13,
-                  color: "var(--popover-foreground)",
-                }}
-              />
-              <Legend
-                wrapperStyle={{ fontFamily: "Nunito Sans, sans-serif", fontSize: 13 }}
-              />
-              {players.map((p) => (
-                <Line
-                  key={p}
-                  type="monotone"
-                  dataKey={p}
-                  stroke={playerColors[p]}
-                  strokeWidth={2.5}
-                  dot={{ r: 4, strokeWidth: 2, fill: "var(--card)" }}
-                  activeDot={{ r: 6 }}
-                  animationDuration={700}
+        <div className="h-90 w-full min-h-[300px]">
+          {isLoading ? (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              Retrieving field notes...
+            </div>
+          ) : error ? (
+            <div className="flex h-full items-center justify-center text-destructive">
+              Error: {error}
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="4 6" stroke="var(--border)" />
+                <XAxis
+                  dataKey="date"
+                  stroke="var(--muted-foreground)"
+                  tick={{ fontSize: 12, fontFamily: "Nunito Sans, sans-serif" }}
+                  tickLine={false}
                 />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  tick={{ fontSize: 12, fontFamily: "Nunito Sans, sans-serif" }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "0.75rem",
+                    fontFamily: "Nunito Sans, sans-serif",
+                    fontSize: 13,
+                    color: "var(--popover-foreground)",
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ fontFamily: "Nunito Sans, sans-serif", fontSize: 13 }}
+                />
+                {players.map((p) => (
+                  <Line
+                    key={p}
+                    type="monotone"
+                    dataKey={p}
+                    stroke={playerColors[p]}
+                    strokeWidth={2.5}
+                    dot={{ r: 4, strokeWidth: 2, fill: "var(--card)" }}
+                    activeDot={{ r: 6 }}
+                    animationDuration={700}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
