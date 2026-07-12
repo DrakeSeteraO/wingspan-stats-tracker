@@ -38,15 +38,21 @@ export function DonationWidget() {
             </span>
             <h2 className="text-2xl font-semibold">A seed for the feeder?</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              If these field notes brighten your game nights, consider tossing a
-              little birdseed our way to keep the site flying.
+              If these field notes brighten your game nights, consider tossing a little birdseed our
+              way to keep the site flying.
             </p>
-            <button
-              className="mt-6 w-full rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
+
+            {/* Updated Button -> Anchor Tag */}
+            <a
+              href="https://buymeacoffee.com/DrakeSetera"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 block w-full rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
               onClick={() => setOpen(false)}
             >
-              Donate — payment link coming soon
-            </button>
+              Buy me a coffee
+            </a>
+
             <button
               className="mt-3 text-xs font-semibold text-muted-foreground hover:text-foreground"
               onClick={() => setOpen(false)}
