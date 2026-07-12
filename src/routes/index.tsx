@@ -86,9 +86,15 @@ function TrendsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch data whenever any filter changes
+// Fetch data whenever any filter changes
   useEffect(() => {
-    const fetchStats = async () => {
+    // Flag to prevent memory leaks if the component unmounts or filters change
+    let isActive = true; 
+    let timeoutId: NodeJS.Timeout;
+
+    const fetchStats = async (attempt: number = 1) => {
+      if (!isActive) return;
+      
       setIsLoading(true);
       setError(null);
       
@@ -110,15 +116,39 @@ function TrendsPage() {
         }
 
         const data = await response.json();
-        setLiveGames(data);
+        
+        if (isActive) {
+          setLiveGames(data);
+          setIsLoading(false); // Only remove loading state on success
+        }
+        
       } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred");
-      } finally {
-        setIsLoading(false);
+        if (!isActive) return;
+
+        // If it's the first failure, wait 60 seconds and try exactly one more time
+        if (attempt === 1) {
+          setIsLoading(false); // Turn off the loading spinner
+          setError("The database is currently asleep and is waking up. Retrying in 60 seconds...");
+          
+          timeoutId = setTimeout(() => {
+            fetchStats(2); // Re-run the function as attempt #2
+          }, 60000); // 60,000 milliseconds = 1 minute
+        } else {
+          // If it fails on the second attempt, show the actual error
+          setError(err instanceof Error ? err.message : "An unknown error occurred.");
+          setIsLoading(false);
+        }
       }
     };
 
     fetchStats();
+
+    // Cleanup function: runs automatically if the user changes a filter 
+    // or navigates away before the 60 seconds are up.
+    return () => {
+      isActive = false;
+      clearTimeout(timeoutId);
+    };
   }, [score, interval, handler, selectedPlayers]);
 
 const activePlayers = useMemo(() => {
