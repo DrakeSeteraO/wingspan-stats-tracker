@@ -16,6 +16,7 @@ DRIVER = os.getenv('DRIVER')
 # File Paths
 WINGSPAN_DOCS_DIR = Path("Wingspan/Container/Documents")
 CACHE_FILE = Path(".uploaded_games.txt")
+SETTINGS_FILE_PATH = WINGSPAN_DOCS_DIR / "Settings.json"
 
 def get_db_connection():
     """Establish a connection to the Azure SQL Database."""
@@ -33,6 +34,22 @@ def mark_as_uploaded(game_id):
     """Append a successfully uploaded game ID to the local cache file."""
     with open(CACHE_FILE, "a") as f:
         f.write(f"{game_id}\n")
+
+def get_true_dates():
+    true_game_dates = {}
+    if SETTINGS_FILE_PATH.exists():
+        with open(SETTINGS_FILE_PATH, "r", encoding="utf-8") as sf:
+            settings_data = json.load(sf)
+            for archive in settings_data.get("ArchivedGameSaves", []):
+                match_id_full = archive.get("MatchId", "")
+                # Extract just the UUID prefix (e.g., "d582585b-e59f-4b4a-a4bf-e0d7888924dc")
+                base_id = match_id_full.split('.')[0] 
+                played_ts = archive.get("GamePlayedDate")
+                
+                if base_id and played_ts:
+                    # Convert the Unix timestamp to a SQL-friendly datetime string
+                    true_game_dates[base_id] = datetime.fromtimestamp(played_ts).strftime('%Y-%m-%d %H:%M:%S')
+    return true_game_dates
 
 def upload_to_azure():
     if not WINGSPAN_DOCS_DIR.exists():
@@ -73,8 +90,13 @@ def upload_to_azure():
                 print(f"⏩ Skipping {game_id} (Already in Azure)")
                 continue
 
-            mtime = os.path.getmtime(file_path)
-            game_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+            game_dates = get_true_dates()
+            id = game_id.split(".")[0]
+            if game_dates[id]:
+                game_date = game_dates[id]
+            else:
+                mtime = os.path.getmtime(file_path)
+                game_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
 
             players = game_data.get("Players", [])
             scores = game_data.get("Scores", [])

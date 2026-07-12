@@ -72,13 +72,12 @@ def update_azure_data():
             temp_id = file_path.name.split('.')[0] 
             game_id = game_data.get("MatchId", temp_id)
             
-            # 2. Get the true date from our dictionary, or fallback to file modified time
+            # 2. Get the true date from the dictionary, or fallback to file modified time
             if temp_id in true_game_dates:
                 game_date = true_game_dates[temp_id]
             else:
                 mtime = os.path.getmtime(file_path)
                 game_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-                print(f"⚠️  Missing true date for {game_id}, falling back to file extraction time.")
 
             players = game_data.get("Players", [])
             scores = game_data.get("Scores", [])
