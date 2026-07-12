@@ -38,4 +38,7 @@ class LedgerData(BaseModel):
     total: int = 0
     wins: int = 0
     win_rate: float = 0.0
+    win_rate_2p: Optional[float] = None
+    win_rate_3p: Optional[float] = None
+    win_rate_4p: Optional[float] = None
         

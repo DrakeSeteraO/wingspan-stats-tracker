@@ -53,6 +53,13 @@ function LedgerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [winRatePlayerCount, setWinRatePlayerCount] = useState(0);
+  const select_win_rate = ["OVERALL", "2 PLAYER", "3 PLAYER", "4 PLAYER"];
+
+  const win_rate_clicked = () => {
+    setWinRatePlayerCount((winRatePlayerCount) => (winRatePlayerCount + 1) % 4);
+  };
+
   // Fetch the ledger data when the component mounts
   useEffect(() => {
     const fetchLedger = async () => {
@@ -138,7 +145,9 @@ function LedgerPage() {
                   <th className="px-4 py-4 sm:px-6">Player</th>
                   <th className="px-4 py-4 text-right">Wins</th>
                   <th className="hidden px-4 py-4 text-right sm:table-cell">Games</th>
-                  <th className="px-4 py-4 text-right">Win Rate</th>
+                  <th className="px-4 py-4 text-right">
+                    <button onClick={win_rate_clicked}>{select_win_rate[winRatePlayerCount]} WIN RATE</button>
+                  </th>
                   <th className="hidden px-4 py-4 text-right sm:table-cell">Avg Score</th>
                   <th className="hidden px-4 py-4 text-right md:table-cell">Total Score</th>
                 </tr>
@@ -162,7 +171,7 @@ function LedgerPage() {
                     <td className="hidden px-4 py-4 text-right text-muted-foreground sm:table-cell">
                       {s.games}
                     </td>
-                    <td className="px-4 py-4 text-right">{s.win_rate}%</td>
+                    <td className="px-4 py-4 text-right">{[s.win_rate, s.win_rate_2p ?? 0, s.win_rate_3p ?? 0, s.win_rate_4p ?? 0][winRatePlayerCount]}%</td>
                     <td className="hidden px-4 py-4 text-right sm:table-cell">{s.average}</td>
                     <td className="hidden px-4 py-4 text-right md:table-cell">
                       {s.total.toLocaleString()}

@@ -31,7 +31,10 @@ def get_ledger():
             avg(b.total) as average,
             sum(b.total) as total,
             SUM(CASE WHEN a.winner_id = c.player_id THEN 1 ELSE 0 END) as wins,
-            ROUND(CAST(SUM(CASE WHEN a.winner_id = c.player_id THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100, 1) as win_rate
+            ROUND(CAST(SUM(CASE WHEN a.winner_id = c.player_id THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100, 1) as win_rate,
+            ROUND(CAST(SUM(CASE WHEN a.player_count = 2 AND a.winner_id = c.player_id THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(SUM(CASE WHEN a.player_count = 2 THEN 1 ELSE 0 END), 0) * 100, 1) as win_rate_2p,
+            ROUND(CAST(SUM(CASE WHEN a.player_count = 3 AND a.winner_id = c.player_id THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(SUM(CASE WHEN a.player_count = 3 THEN 1 ELSE 0 END), 0) * 100, 1) as win_rate_3p,
+            ROUND(CAST(SUM(CASE WHEN a.player_count = 4 AND a.winner_id = c.player_id THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(SUM(CASE WHEN a.player_count = 4 THEN 1 ELSE 0 END), 0) * 100, 1) as win_rate_4p
         FROM
             game a,
             player_game_stats b, 
