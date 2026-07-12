@@ -14,14 +14,13 @@ import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { MetricSelect } from "../components/MetricSelect";
 import { players, type GameRecord } from "../data/mockData";
 import { Switch } from "@/components/ui/switch";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronDown } from "lucide-react";
 import { getApiUrl } from "@/lib/api-config";
+
+// A simple in-memory cache to store API responses
+const apiCache = new Map<string, GameRecord[]>();
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -80,7 +79,7 @@ function TrendsPage() {
   const [handler, setHandler] = useState<string>("sum");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]); // [] = All
   const [showTrend, setShowTrend] = useState<boolean>(true);
-  
+
   // New API State Management
   const [liveGames, setLiveGames] = useState<GameRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,26 +87,36 @@ function TrendsPage() {
 
 // Fetch data whenever any filter changes
   useEffect(() => {
-    // Flag to prevent memory leaks if the component unmounts or filters change
-    let isActive = true; 
+    let isActive = true;
     let timeoutId: NodeJS.Timeout;
 
     const fetchStats = async (attempt: number = 1) => {
       if (!isActive) return;
-      
+
+      // 1. Create a unique string key based on the current filters
+      const cacheKey = JSON.stringify({
+        score,
+        interval,
+        handler,
+        players: selectedPlayers,
+      });
+
+      // 2. Check the cache FIRST
+      if (apiCache.has(cacheKey)) {
+        setLiveGames(apiCache.get(cacheKey)!);
+        setIsLoading(false);
+        setError(null);
+        return; // Exit the function early! No API call needed.
+      }
+
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const response = await fetch(getApiUrl("/api/trend"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            score,
-            interval,
-            handler,
-            players: selectedPlayers, // [] means all players (backend contract)
-          }),
+          body: cacheKey, // We can just pass the stringified key directly!
         });
 
         if (!response.ok) {
@@ -116,25 +125,24 @@ function TrendsPage() {
         }
 
         const data = await response.json();
-        
+
         if (isActive) {
+          // 3. Save the fresh data into the cache for next time
+          apiCache.set(cacheKey, data);
           setLiveGames(data);
-          setIsLoading(false); // Only remove loading state on success
+          setIsLoading(false);
         }
-        
       } catch (err) {
         if (!isActive) return;
 
-        // If it's the first failure, wait 60 seconds and try exactly one more time
         if (attempt === 1) {
-          setIsLoading(false); // Turn off the loading spinner
+          setIsLoading(false);
           setError("The database is currently asleep and is waking up. Retrying in 60 seconds...");
-          
+
           timeoutId = setTimeout(() => {
-            fetchStats(2); // Re-run the function as attempt #2
-          }, 60000); // 60,000 milliseconds = 1 minute
+            fetchStats(2);
+          }, 60000);
         } else {
-          // If it fails on the second attempt, show the actual error
           setError(err instanceof Error ? err.message : "An unknown error occurred.");
           setIsLoading(false);
         }
@@ -143,15 +151,13 @@ function TrendsPage() {
 
     fetchStats();
 
-    // Cleanup function: runs automatically if the user changes a filter 
-    // or navigates away before the 60 seconds are up.
     return () => {
       isActive = false;
       clearTimeout(timeoutId);
     };
   }, [score, interval, handler, selectedPlayers]);
 
-const activePlayers = useMemo(() => {
+  const activePlayers = useMemo(() => {
     const names = new Set<string>();
     liveGames.forEach((game) => {
       game.results.forEach((r) => names.add(r.player));
@@ -170,7 +176,7 @@ const activePlayers = useMemo(() => {
       }
 
       const row: Record<string, string | number> = { date: displayDate };
-      
+
       for (const r of game.results) {
         // Backend returns { player, <metricKey>: value } where metricKey is
         // "totalPoints" when score === "total", otherwise the raw score name.
@@ -182,7 +188,10 @@ const activePlayers = useMemo(() => {
 
     // 2. Calculate Linear Regression (Line of Best Fit) for each player
     activePlayers.forEach((player) => {
-      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      let sumX = 0,
+        sumY = 0,
+        sumXY = 0,
+        sumXX = 0;
       let count = 0;
 
       // Gather stats for the math
@@ -212,7 +221,6 @@ const activePlayers = useMemo(() => {
     return baseData;
   }, [liveGames, score, activePlayers]);
 
-
   // A dynamic color palette to replace the hardcoded mock colors
   const colorPalette = [
     "var(--chart-1)",
@@ -234,12 +242,9 @@ const activePlayers = useMemo(() => {
       ? selectedPlayers[0]
       : `${selectedPlayers.length} selected`;
 
-  const currentScoreLabel =
-    scoreOptions.find((o) => o.value === score)?.label ?? score;
-  const currentHandlerLabel =
-    handlerOptions.find((o) => o.value === handler)?.label ?? handler;
-  const currentIntervalLabel =
-    intervalOptions.find((o) => o.value === interval)?.label ?? interval;
+  const currentScoreLabel = scoreOptions.find((o) => o.value === score)?.label ?? score;
+  const currentHandlerLabel = handlerOptions.find((o) => o.value === handler)?.label ?? handler;
+  const currentIntervalLabel = intervalOptions.find((o) => o.value === interval)?.label ?? interval;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -250,8 +255,8 @@ const activePlayers = useMemo(() => {
           </p>
           <h1 className="mt-2 text-4xl font-semibold sm:text-5xl">Score Trends</h1>
           <p className="mt-3 max-w-xl text-muted-foreground">
-            A season of games, sketched like a migration chart. Choose a metric
-            to trace how each member of the flock has fared.
+            A season of games, sketched like a migration chart. Choose a metric to trace how each
+            member of the flock has fared.
           </p>
         </div>
       </div>
@@ -259,12 +264,7 @@ const activePlayers = useMemo(() => {
       {/* Control panel */}
       <div className="field-card mt-8 p-4 sm:p-6 lg:p-8">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
-          <MetricSelect
-            label="Score"
-            value={score}
-            options={scoreOptions}
-            onChange={setScore}
-          />
+          <MetricSelect label="Score" value={score} options={scoreOptions} onChange={setScore} />
           <MetricSelect
             label="Interval"
             value={interval}
@@ -367,9 +367,7 @@ const activePlayers = useMemo(() => {
                     color: "var(--popover-foreground)",
                   }}
                 />
-                <Legend
-                  wrapperStyle={{ fontFamily: "Nunito Sans, sans-serif", fontSize: 13 }}
-                />
+                <Legend wrapperStyle={{ fontFamily: "Nunito Sans, sans-serif", fontSize: 13 }} />
                 {/* Real Data Lines */}
                 {activePlayers.map((p, index) => (
                   <Line
@@ -386,22 +384,23 @@ const activePlayers = useMemo(() => {
                 ))}
 
                 {/* Dotted Trend Lines */}
-                {showTrend && activePlayers.map((p, index) => (
-                  <Line
-                    key={`${p}_trend`}
-                    type="linear"
-                    dataKey={`${p}_trend`}
-                    name={`${p} Trend`}
-                    stroke={colorPalette[index % colorPalette.length]}
-                    strokeWidth={2}
-                    strokeDasharray="5 5" // Makes it dotted
-                    dot={false} // Removes the points on the trendline
-                    activeDot={false} // Stops the user from hovering directly on the trendline
-                    legendType="none" // Hides the extra lines from the legend
-                    animationDuration={700}
-                    opacity={0.4} // Fades it into the background
-                  />
-                ))}
+                {showTrend &&
+                  activePlayers.map((p, index) => (
+                    <Line
+                      key={`${p}_trend`}
+                      type="linear"
+                      dataKey={`${p}_trend`}
+                      name={`${p} Trend`}
+                      stroke={colorPalette[index % colorPalette.length]}
+                      strokeWidth={2}
+                      strokeDasharray="5 5" // Makes it dotted
+                      dot={false} // Removes the points on the trendline
+                      activeDot={false} // Stops the user from hovering directly on the trendline
+                      legendType="none" // Hides the extra lines from the legend
+                      animationDuration={700}
+                      opacity={0.4} // Fades it into the background
+                    />
+                  ))}
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -409,7 +408,10 @@ const activePlayers = useMemo(() => {
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <ArtPlaceholder label="Bird card art slot — e.g. featured bird of the season" className="h-40" />
+        <ArtPlaceholder
+          label="Bird card art slot — e.g. featured bird of the season"
+          className="h-40"
+        />
         <ArtPlaceholder label="Watercolor habitat background slot" className="h-40" />
         <ArtPlaceholder label="Player avatar / flock illustration slot" className="h-40" />
       </div>

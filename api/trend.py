@@ -82,7 +82,7 @@ def get_stats(request: StatsRequest):
 
     if request.players:
         placeholders = ", ".join(["%s"] * len(request.players))
-        where_clause = f"WHERE p.username IN ({placeholders})"
+        where_clause = f"WHERE p.name IN ({placeholders})"
         query_params = tuple(request.players)
         
     if req_interval in ['all', 'all-time']:
