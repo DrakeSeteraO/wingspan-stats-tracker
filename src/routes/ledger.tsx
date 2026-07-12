@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Egg, Feather, Trophy } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { MetricSelect } from "../components/MetricSelect";
 import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { games, mostPlayedBirds, playerColors, players } from "../data/mockData";
+import { getApiUrl } from "@/lib/api-config"; // Make sure to import your API helper
 
 export const Route = createFileRoute("/ledger")({
   head: () => ({
@@ -31,29 +32,58 @@ const viewOptions = [
   { value: "birds", label: "Most Played Bird" },
 ];
 
+// Interface matching the Python LedgerData schema
+export interface LedgerRecord {
+  name: string;
+  username: string;
+  games: number;
+  average: number;
+  total: number;
+  wins: number;
+  win_rate: number;
+}
+
 function LedgerPage() {
   const [view, setView] = useState<View>("wins");
+  
+  // New API State Management for the Ledger
+  const [ledgerData, setLedgerData] = useState<LedgerRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const winStats = useMemo(
-    () =>
-      players
-        .map((p) => {
-          const results = games.flatMap((g) => g.results.filter((r) => r.player === p));
-          const wins = games.filter((g) => g.winner === p).length;
-          const totalPoints = results.reduce((s, r) => s + r.totalPoints, 0);
-          return {
-            player: p,
-            wins,
-            games: results.length,
-            winRate: Math.round((wins / games.length) * 100),
-            avgPoints: Math.round((totalPoints / results.length) * 10) / 10,
-            totalEggs: results.reduce((s, r) => s + r.eggs, 0),
-          };
-        })
-        .sort((a, b) => b.wins - a.wins),
-    [],
-  );
+  // Fetch the ledger data when the component mounts
+  useEffect(() => {
+    const fetchLedger = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch(getApiUrl("/api/ledger"), {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
 
+        if (!response.ok) {
+          throw new Error("Failed to fetch ledger data");
+        }
+
+        const data: LedgerRecord[] = await response.json();
+        
+        // Sort the data by wins (highest to lowest) before saving to state
+        const sortedData = data.sort((a, b) => b.wins - a.wins);
+        setLedgerData(sortedData);
+        
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An unknown error occurred");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLedger();
+  }, []);
+
+  // Keeping the mock high score logic until a backend route is created
   const highScores = useMemo(
     () =>
       players
@@ -91,43 +121,54 @@ function LedgerPage() {
       </div>
 
       {view === "wins" && (
-        <div className="field-card mt-8 overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/60 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                <th className="px-4 py-4 sm:px-6">Player</th>
-                <th className="px-4 py-4 text-right">Wins</th>
-                <th className="hidden px-4 py-4 text-right sm:table-cell">Games</th>
-                <th className="px-4 py-4 text-right">Win Rate</th>
-                <th className="hidden px-4 py-4 text-right sm:table-cell">Avg Score</th>
-                <th className="hidden px-4 py-4 text-right md:table-cell">Total Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {winStats.map((s, i) => (
-                <tr key={s.player} className="border-b border-border/60 last:border-0">
-                  <td className="px-4 py-4 sm:px-6">
-                    <span className="flex items-center gap-3 font-semibold">
-                      <span
-                        className="h-3 w-3 rounded-full"
-                        style={{ backgroundColor: playerColors[s.player] }}
-                      />
-                      {s.player}
-                      {i === 0 && <Trophy className="h-4 w-4 text-nectar" />}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-right font-serif text-lg font-semibold">{s.wins}</td>
-                  <td className="hidden px-4 py-4 text-right text-muted-foreground sm:table-cell">{s.games}</td>
-                  <td className="px-4 py-4 text-right">{s.winRate}%</td>
-                  <td className="hidden px-4 py-4 text-right sm:table-cell">{s.avgPoints}</td>
-                  <td className="hidden px-4 py-4 text-right md:table-cell">{s.totalEggs}</td>
+        <div className="field-card mt-8 overflow-hidden min-h-[300px]">
+          {isLoading ? (
+             <div className="flex h-64 items-center justify-center text-muted-foreground">
+               Retrieving the record book...
+             </div>
+          ) : error ? (
+             <div className="flex h-64 items-center justify-center text-destructive">
+               Error: {error}
+             </div>
+          ) : (
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/60 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  <th className="px-4 py-4 sm:px-6">Player</th>
+                  <th className="px-4 py-4 text-right">Wins</th>
+                  <th className="hidden px-4 py-4 text-right sm:table-cell">Games</th>
+                  <th className="px-4 py-4 text-right">Win Rate</th>
+                  <th className="hidden px-4 py-4 text-right sm:table-cell">Avg Score</th>
+                  <th className="hidden px-4 py-4 text-right md:table-cell">Total Score</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {ledgerData.map((s, i) => (
+                  <tr key={s.username} className="border-b border-border/60 last:border-0">
+                    <td className="px-4 py-4 sm:px-6">
+                      <span className="flex items-center gap-3 font-semibold">
+                        <span
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: playerColors[s.name] || "var(--chart-5)" }}
+                        />
+                        {s.name}
+                        {i === 0 && <Trophy className="h-4 w-4 text-nectar" />}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-right font-serif text-lg font-semibold">{s.wins}</td>
+                    <td className="hidden px-4 py-4 text-right text-muted-foreground sm:table-cell">{s.games}</td>
+                    <td className="px-4 py-4 text-right">{s.win_rate}%</td>
+                    <td className="hidden px-4 py-4 text-right sm:table-cell">{s.average}</td>
+                    <td className="hidden px-4 py-4 text-right md:table-cell">{s.total.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
+      {/* High Scores View (Mock Data) */}
       {view === "highScore" && (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {highScores.map((s, i) => (
@@ -153,6 +194,7 @@ function LedgerPage() {
         </div>
       )}
 
+      {/* Most Played Birds View (Mock Data) */}
       {view === "birds" && (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {mostPlayedBirds.map((b, i) => (
