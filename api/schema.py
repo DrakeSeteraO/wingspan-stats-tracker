@@ -41,4 +41,21 @@ class LedgerData(BaseModel):
     win_rate_2p: Optional[float] = None
     win_rate_3p: Optional[float] = None
     win_rate_4p: Optional[float] = None
-        
+
+
+class PlayerHighScoreData(BaseModel):
+    name: str = "Unknown"
+    score: int = 0
+    date: Union[str, int]
+
+
+class RecordHighScore(BaseModel):
+    name: str = ""
+    score: int = 0
+    achiever: str
+    date: Union[str, int]
+
+
+class HighScoreReturn(BaseModel):
+    personal: List[PlayerHighScoreData]
+    overall: List[RecordHighScore]
