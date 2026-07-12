@@ -227,8 +227,8 @@ const activePlayers = useMemo(() => {
       </div>
 
       {/* Control panel */}
-      <div className="field-card mt-8 p-4 sm:p-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="field-card mt-8 p-4 sm:p-6 lg:p-8">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
           <MetricSelect
             label="Score"
             value={score}
