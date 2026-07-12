@@ -1,10 +1,15 @@
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # api/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Note the 'routes.' prefix to match your new file tree!
-from routes.ledger import router as ledger_router
-from routes.trend import router as trend_router 
+from api.routes.ledger import router as ledger_router
+from api.routes.trend import router as trend_router 
 
 app = FastAPI()
 

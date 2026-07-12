@@ -7,7 +7,7 @@ import sys
 from dotenv import load_dotenv
 
 # Import your Pydantic model from the schema.py file in the root directory
-from schema import LedgerData
+from api.schema import LedgerData
 
 router = APIRouter()
 

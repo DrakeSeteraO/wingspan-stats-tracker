@@ -7,7 +7,7 @@ import sys
 from dotenv import load_dotenv
 
 # Import your Pydantic model from the schema.py file in the root directory
-from schema import TrendRequest, TrendRecord
+from api.schema import TrendRequest, TrendRecord
 
 router = APIRouter()
 
