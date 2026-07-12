@@ -12,12 +12,14 @@ export const Route = createFileRoute("/ledger")({
       { title: "The Ledger — Wingspan Field Notes" },
       {
         name: "description",
-        content: "Exact Wingspan statistics: wins per player, record scores, and most played birds.",
+        content:
+          "Exact Wingspan statistics: wins per player, record scores, and most played birds.",
       },
       { property: "og:title", content: "The Ledger — Wingspan Field Notes" },
       {
         property: "og:description",
-        content: "Exact Wingspan statistics: wins per player, record scores, and most played birds.",
+        content:
+          "Exact Wingspan statistics: wins per player, record scores, and most played birds.",
       },
     ],
   }),
@@ -45,7 +47,7 @@ export interface LedgerRecord {
 
 function LedgerPage() {
   const [view, setView] = useState<View>("wins");
-  
+
   // New API State Management for the Ledger
   const [ledgerData, setLedgerData] = useState<LedgerRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +58,7 @@ function LedgerPage() {
     const fetchLedger = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const response = await fetch(getApiUrl("/api/ledger"), {
           method: "GET",
@@ -68,11 +70,10 @@ function LedgerPage() {
         }
 
         const data: LedgerRecord[] = await response.json();
-        
+
         // Sort the data by wins (highest to lowest) before saving to state
         const sortedData = data.sort((a, b) => b.wins - a.wins);
         setLedgerData(sortedData);
-        
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unknown error occurred");
       } finally {
@@ -108,8 +109,8 @@ function LedgerPage() {
           </p>
           <h1 className="mt-2 text-4xl font-semibold sm:text-5xl">The Ledger</h1>
           <p className="mt-3 max-w-xl text-muted-foreground">
-            Exact figures, carefully inked. Every win, record score, and
-            favorite bird from the flock's game nights.
+            Exact figures, carefully inked. Every win, record score, and favorite bird from the
+            flock's game nights.
           </p>
         </div>
         <MetricSelect
@@ -123,13 +124,13 @@ function LedgerPage() {
       {view === "wins" && (
         <div className="field-card mt-8 overflow-hidden min-h-[300px]">
           {isLoading ? (
-             <div className="flex h-64 items-center justify-center text-muted-foreground">
-               Retrieving the record book...
-             </div>
+            <div className="flex h-64 items-center justify-center text-muted-foreground">
+              Retrieving the record book...
+            </div>
           ) : error ? (
-             <div className="flex h-64 items-center justify-center text-destructive">
-               Error: {error}
-             </div>
+            <div className="flex h-64 items-center justify-center text-destructive">
+              Error: {error}
+            </div>
           ) : (
             <table className="w-full text-left text-sm">
               <thead>
@@ -155,11 +156,17 @@ function LedgerPage() {
                         {i === 0 && <Trophy className="h-4 w-4 text-nectar" />}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-right font-serif text-lg font-semibold">{s.wins}</td>
-                    <td className="hidden px-4 py-4 text-right text-muted-foreground sm:table-cell">{s.games}</td>
+                    <td className="px-4 py-4 text-right font-serif text-lg font-semibold">
+                      {s.wins}
+                    </td>
+                    <td className="hidden px-4 py-4 text-right text-muted-foreground sm:table-cell">
+                      {s.games}
+                    </td>
                     <td className="px-4 py-4 text-right">{s.win_rate}%</td>
                     <td className="hidden px-4 py-4 text-right sm:table-cell">{s.average}</td>
-                    <td className="hidden px-4 py-4 text-right md:table-cell">{s.total.toLocaleString()}</td>
+                    <td className="hidden px-4 py-4 text-right md:table-cell">
+                      {s.total.toLocaleString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -183,11 +190,13 @@ function LedgerPage() {
               <p className="mt-4 text-sm font-semibold text-muted-foreground">{s.player}'s best</p>
               <p className="mt-1 font-serif text-4xl font-semibold">{s.points}</p>
               <p className="mt-2 text-xs text-muted-foreground">
-                {new Date(s.date + "T00:00:00").toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                })}
+                {s.date
+                  ? new Date(s.date + "T00:00:00").toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "No date found"}
               </p>
             </div>
           ))}

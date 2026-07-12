@@ -85,7 +85,7 @@ function TrendsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-// Fetch data whenever any filter changes
+  // Fetch data whenever any filter changes
   useEffect(() => {
     let isActive = true;
     let timeoutId: NodeJS.Timeout;
