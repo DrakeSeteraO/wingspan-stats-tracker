@@ -13,11 +13,11 @@ export function MetricSelect({ label, value, options, onChange }: MetricSelectPr
       <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
-      <span className="relative inline-flex">
+      <span className="relative block w-full">
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none rounded-full border border-border bg-card py-2.5 pl-5 pr-11 text-sm font-semibold text-card-foreground shadow-feather outline-none transition-colors focus:border-ring sm:w-auto sm:min-w-72"
+          className="w-full appearance-none rounded-full border border-border bg-card py-2.5 pl-5 pr-11 text-sm font-semibold text-card-foreground shadow-feather outline-none transition-colors focus:border-ring"
         >
           {options.map((o) => (
             <option key={o.value} value={o.value}>
