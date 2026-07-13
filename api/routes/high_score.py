@@ -19,7 +19,7 @@ PASSWORD = os.getenv('API_PASSWORD')
 @router.get("/api/high-score", response_model=HighScoreReturn, response_model_exclude_none=True)
 def get_high_scores():
     
-    # 1. Query for Personal Bests (Unchanged)
+    # 1. Query for Personal Bests
     personal_query = """
         WITH RankedScores AS (
             SELECT 
@@ -35,7 +35,7 @@ def get_high_scores():
         SELECT name, score, date FROM RankedScores WHERE rn = 1;
     """
 
-    # 2. Query for Global Records using RANK() to allow for ties
+    # 2. Query for Global Records with Player Deduplication
     overall_query = """
         WITH UnpivotedStats AS (
             SELECT 
@@ -59,6 +59,16 @@ def get_high_scores():
             ) x (Category, Score)
             WHERE c.name != 'Unknown' AND Score IS NOT NULL
         ),
+        -- NEW: Filter so a player only appears once per unique score, keeping their earliest date
+        PlayerScoreEarliest AS (
+            SELECT 
+                Category,
+                Score,
+                achiever,
+                date,
+                ROW_NUMBER() OVER(PARTITION BY Category, achiever, Score ORDER BY date ASC) as rn_player
+            FROM UnpivotedStats
+        ),
         RankedRecords AS (
             SELECT 
                 Category as name,
@@ -66,7 +76,8 @@ def get_high_scores():
                 achiever,
                 date,
                 RANK() OVER(PARTITION BY Category ORDER BY Score DESC) as rnk
-            FROM UnpivotedStats
+            FROM PlayerScoreEarliest
+            WHERE rn_player = 1
         )
         -- Order by name and date ASC to ensure chronological order for ties
         SELECT name, score, achiever, date FROM RankedRecords WHERE rnk = 1 ORDER BY name, date ASC;
@@ -90,7 +101,7 @@ def get_high_scores():
         
         conn.close()
         
-        # 3. Group the overall records into the new array structure
+        # 3. Group the overall records into the array structure
         grouped_overall = {}
         for row in overall_results:
             cat = row['name']
