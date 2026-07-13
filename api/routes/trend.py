@@ -45,6 +45,7 @@ def get_stats(request: TrendRequest):
     allowed_intervals = {
         'game': 'g.game_id',
         'day': 'CAST(g.date AS DATE)',
+        'week': 'CAST(DATEADD(week, DATEDIFF(week, 0, g.date), 0) AS DATE)',
         'month': "FORMAT(g.date, 'yyyy-MM')",
         'year': "FORMAT(g.date, 'yyyy')",
         'all': "'All-Time'" # Wrapped in single quotes to act as a SQL string literal
