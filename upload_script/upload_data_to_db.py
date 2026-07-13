@@ -65,6 +65,10 @@ def upload_to_azure():
     uploaded_games = load_uploaded_cache()
     print(f"📂 Found {len(uploaded_games)} previously uploaded games in local cache.")
 
+    # 1. Load the true dates ONCE before the loop starts
+    game_dates = get_true_dates()
+    print(f"📖 Loaded {len(game_dates)} exact game dates from settings.")
+
     print("🔌 Connecting to Azure SQL...")
     try:
         conn = get_db_connection()
@@ -77,7 +81,6 @@ def upload_to_azure():
     for file_path in match_files:
         try:
             # Extract just the ID first to check our cache before reading the whole file
-            # Assuming the filename format is something like UUID.nakama-0
             temp_id = file_path.name.split('.')[0] 
             
             with open(file_path, "r", encoding="utf-8") as f:
@@ -90,9 +93,9 @@ def upload_to_azure():
                 print(f"⏩ Skipping {game_id} (Already in Azure)")
                 continue
 
-            game_dates = get_true_dates()
+            # 2. Safely check for the date without triggering a KeyError
             id = game_id.split(".")[0]
-            if game_dates[id]:
+            if id in game_dates:
                 game_date = game_dates[id]
             else:
                 mtime = os.path.getmtime(file_path)
