@@ -49,11 +49,15 @@ class PlayerHighScoreData(BaseModel):
     date: Union[str, int]
 
 
+class AchieverDetail(BaseModel):
+    name: str
+    date: Union[str, int]
+
+
 class RecordHighScore(BaseModel):
     name: str = ""
     score: int = 0
-    achiever: str
-    date: Union[str, int]
+    achievers: List[AchieverDetail]
 
 
 class HighScoreReturn(BaseModel):

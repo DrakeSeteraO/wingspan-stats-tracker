@@ -4,7 +4,6 @@ import pymssql
 import os
 from dotenv import load_dotenv
 
-# Import your Pydantic model from the schema.py file in the root directory
 from api.schema import HighScoreReturn
 
 router = APIRouter()
@@ -17,11 +16,10 @@ DATABASE = os.getenv('DATABASE')
 USERNAME = os.getenv('API_USERNAME')
 PASSWORD = os.getenv('API_PASSWORD')
 
-# Changed response_model to HighScoreReturn (not List[HighScoreReturn])
 @router.get("/api/high-score", response_model=HighScoreReturn, response_model_exclude_none=True)
-def get_high_scores(): # Renamed from get_ledger
+def get_high_scores():
     
-    # 1. Query to get the highest overall score for each individual player
+    # 1. Query for Personal Bests (Unchanged)
     personal_query = """
         WITH RankedScores AS (
             SELECT 
@@ -37,7 +35,7 @@ def get_high_scores(): # Renamed from get_ledger
         SELECT name, score, date FROM RankedScores WHERE rn = 1;
     """
 
-    # 2. Query to unpivot the stats and find the single highest score in the group per category
+    # 2. Query for Global Records using RANK() to allow for ties
     overall_query = """
         WITH UnpivotedStats AS (
             SELECT 
@@ -67,10 +65,11 @@ def get_high_scores(): # Renamed from get_ledger
                 Score as score,
                 achiever,
                 date,
-                ROW_NUMBER() OVER(PARTITION BY Category ORDER BY Score DESC, date ASC) as rn
+                RANK() OVER(PARTITION BY Category ORDER BY Score DESC) as rnk
             FROM UnpivotedStats
         )
-        SELECT name, score, achiever, date FROM RankedRecords WHERE rn = 1;
+        -- Order by name and date ASC to ensure chronological order for ties
+        SELECT name, score, achiever, date FROM RankedRecords WHERE rnk = 1 ORDER BY name, date ASC;
     """
 
     try:
@@ -83,20 +82,35 @@ def get_high_scores(): # Renamed from get_ledger
         
         cursor = conn.cursor(as_dict=True)
         
-        # Execute the personal bests query
         cursor.execute(personal_query)
         personal_results = cursor.fetchall()
         
-        # Execute the overall records query
         cursor.execute(overall_query)
         overall_results = cursor.fetchall()
         
         conn.close()
         
-        # Return a single dictionary that perfectly matches HighScoreReturn
+        # 3. Group the overall records into the new array structure
+        grouped_overall = {}
+        for row in overall_results:
+            cat = row['name']
+            if cat not in grouped_overall:
+                grouped_overall[cat] = {
+                    "name": cat,
+                    "score": row['score'],
+                    "achievers": []
+                }
+            # Append the tied player to the achievers array
+            grouped_overall[cat]["achievers"].append({
+                "name": row['achiever'],
+                "date": row['date']
+            })
+            
+        final_overall = list(grouped_overall.values())
+        
         return {
             "personal": personal_results,
-            "overall": overall_results
+            "overall": final_overall
         }
 
     except Exception as e:

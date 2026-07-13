@@ -54,11 +54,16 @@ export interface PlayerHighScoreData {
   date: string | number;
 }
 
+// New Interface for ties
+export interface AchieverDetail {
+  name: string;
+  date: string | number;
+}
+
 export interface RecordHighScore {
   name: string;
   score: number;
-  achiever: string;
-  date: string | number;
+  achievers: AchieverDetail[]; // Changed from a single string to an array
 }
 
 export interface HighScoreReturn {
@@ -279,17 +284,22 @@ function LedgerPage() {
                       </div>
                       <p className="mt-2 font-serif text-4xl font-semibold">{s.score}</p>
                     </div>
-                    <div className="mt-4 pt-4 border-t border-border/60">
-                      <p className="text-sm font-semibold flex items-center gap-2">
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: playerColors[s.achiever] || "var(--chart-5)" }}
-                        />
-                        {s.achiever}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {formatDate(s.date)}
-                      </p>
+                    {/* Iterate over all tied players chronologically */}
+                    <div className="mt-4 pt-4 border-t border-border/60 flex flex-col gap-3">
+                      {s.achievers.map((achiever, idx) => (
+                        <div key={idx}>
+                          <p className="text-sm font-semibold flex items-center gap-2">
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: playerColors[achiever.name] || "var(--chart-5)" }}
+                            />
+                            {achiever.name}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {formatDate(achiever.date)}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
