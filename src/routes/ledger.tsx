@@ -71,6 +71,10 @@ export interface HighScoreReturn {
   overall: RecordHighScore[];
 }
 
+// Simple in-memory caches to store API responses
+const ledgerCache = new Map<string, LedgerRecord[]>();
+const highScoreCache = new Map<string, HighScoreReturn>();
+
 function LedgerPage() {
   const [view, setView] = useState<View>("wins");
 
@@ -95,6 +99,15 @@ function LedgerPage() {
   // Fetch all API data when the component mounts
   useEffect(() => {
     const fetchAllData = async () => {
+      // 1. Check the caches FIRST
+      if (ledgerCache.has("ledgerData") && highScoreCache.has("highScoreData")) {
+        setLedgerData(ledgerCache.get("ledgerData")!);
+        setHighScoreData(highScoreCache.get("highScoreData")!);
+        setIsLoading(false);
+        setIsHighScoreLoading(false);
+        return; // Exit early, no API call needed!
+      }
+
       setIsLoading(true);
       setError(null);
       setIsHighScoreLoading(true);
@@ -118,12 +131,15 @@ function LedgerPage() {
         const ledgerDataRaw: LedgerRecord[] = await ledgerRes.json();
         const highDataRaw: HighScoreReturn = await highRes.json();
 
-        // Save ledger data
-        setLedgerData(ledgerDataRaw.sort((a, b) => b.wins - a.wins));
+        // 2. Sort ledger data and save to state AND cache
+        const sortedLedger = ledgerDataRaw.sort((a, b) => b.wins - a.wins);
+        setLedgerData(sortedLedger);
+        ledgerCache.set("ledgerData", sortedLedger);
 
-        // Sort personal records highest to lowest, then save high score data
+        // 3. Sort personal records and save to state AND cache
         highDataRaw.personal.sort((a, b) => b.score - a.score);
         setHighScoreData(highDataRaw);
+        highScoreCache.set("highScoreData", highDataRaw);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : "An unknown error occurred";
         setError(errMsg);
@@ -188,7 +204,10 @@ function LedgerPage() {
                   <th className="px-4 py-4 text-right">Wins</th>
                   <th className="hidden px-4 py-4 text-right sm:table-cell">Games</th>
                   <th className="px-4 py-4 text-right">
-                    <button onClick={win_rate_clicked} className="hover:text-primary transition-colors">
+                    <button
+                      onClick={win_rate_clicked}
+                      className="hover:text-primary transition-colors"
+                    >
                       {select_win_rate[winRatePlayerCount]} WIN RATE
                     </button>
                   </th>
@@ -246,65 +265,69 @@ function LedgerPage() {
             <div className="flex h-64 items-center justify-center text-destructive field-card mt-8">
               Error: {highScoreError}
             </div>
-          ) : highScoreData && (
-            <>
-              {/* 1. Personal Records Section */}
-              <h2 className="mt-10 text-2xl font-semibold">Personal Bests</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {highScoreData.personal.map((s, i) => (
-                  <div key={s.name} className="field-card p-6">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-3 font-semibold">
-                        <span
-                          className="h-3 w-3 rounded-full"
-                          style={{ backgroundColor: playerColors[s.name] || "var(--chart-5)" }}
-                        />
-                        {s.name}
-                      </span>
-                      {i === 0 && <Trophy className="h-4 w-4 text-nectar" />}
-                    </div>
-                    <p className="mt-4 text-sm font-semibold text-muted-foreground">Highest Score</p>
-                    <p className="mt-1 font-serif text-4xl font-semibold">{s.score}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {formatDate(s.date)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              {/* 2. Global Records Section */}
-              <h2 className="mt-12 text-2xl font-semibold">Global Records</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {highScoreData.overall.map((s) => (
-                  <div key={s.name} className="field-card p-6 flex flex-col justify-between">
-                    <div>
+          ) : (
+            highScoreData && (
+              <>
+                {/* 1. Personal Records Section */}
+                <h2 className="mt-10 text-2xl font-semibold">Personal Bests</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {highScoreData.personal.map((s, i) => (
+                    <div key={s.name} className="field-card p-6">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-primary">{s.name}</span>
-                        <Trophy className="h-4 w-4 text-muted-foreground" />
+                        <span className="flex items-center gap-3 font-semibold">
+                          <span
+                            className="h-3 w-3 rounded-full"
+                            style={{ backgroundColor: playerColors[s.name] || "var(--chart-5)" }}
+                          />
+                          {s.name}
+                        </span>
+                        {i === 0 && <Trophy className="h-4 w-4 text-nectar" />}
                       </div>
-                      <p className="mt-2 font-serif text-4xl font-semibold">{s.score}</p>
+                      <p className="mt-4 text-sm font-semibold text-muted-foreground">
+                        Highest Score
+                      </p>
+                      <p className="mt-1 font-serif text-4xl font-semibold">{s.score}</p>
+                      <p className="mt-2 text-xs text-muted-foreground">{formatDate(s.date)}</p>
                     </div>
-                    {/* Iterate over all tied players chronologically */}
-                    <div className="mt-4 pt-4 border-t border-border/60 flex flex-col gap-3">
-                      {s.achievers.map((achiever, idx) => (
-                        <div key={idx}>
-                          <p className="text-sm font-semibold flex items-center gap-2">
-                            <span
-                              className="h-2 w-2 rounded-full"
-                              style={{ backgroundColor: playerColors[achiever.name] || "var(--chart-5)" }}
-                            />
-                            {achiever.name}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {formatDate(achiever.date)}
-                          </p>
+                  ))}
+                </div>
+
+                {/* 2. Global Records Section */}
+                <h2 className="mt-12 text-2xl font-semibold">Global Records</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {highScoreData.overall.map((s) => (
+                    <div key={s.name} className="field-card p-6 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-primary">{s.name}</span>
+                          <Trophy className="h-4 w-4 text-muted-foreground" />
                         </div>
-                      ))}
+                        <p className="mt-2 font-serif text-4xl font-semibold">{s.score}</p>
+                      </div>
+                      {/* Iterate over all tied players chronologically */}
+                      <div className="mt-4 pt-4 border-t border-border/60 flex flex-col gap-3">
+                        {s.achievers.map((achiever, idx) => (
+                          <div key={idx}>
+                            <p className="text-sm font-semibold flex items-center gap-2">
+                              <span
+                                className="h-2 w-2 rounded-full"
+                                style={{
+                                  backgroundColor: playerColors[achiever.name] || "var(--chart-5)",
+                                }}
+                              />
+                              {achiever.name}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {formatDate(achiever.date)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </>
+                  ))}
+                </div>
+              </>
+            )
           )}
         </div>
       )}
