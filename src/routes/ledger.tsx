@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Egg, Feather, Trophy } from "lucide-react";
+import { Egg, Feather, Trophy, ArrowDownWideNarrow } from "lucide-react";
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { MetricSelect } from "../components/MetricSelect";
 import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { mostPlayedBirds, playerColors } from "../data/mockData";
@@ -15,12 +16,6 @@ export const Route = createFileRoute("/ledger")({
         content:
           "Exact Wingspan statistics: wins per player, record scores, and most played birds.",
       },
-      { property: "og:title", content: "The Ledger — Wingspan Field Notes" },
-      {
-        property: "og:description",
-        content:
-          "Exact Wingspan statistics: wins per player, record scores, and most played birds.",
-      },
     ],
   }),
   component: LedgerPage,
@@ -28,13 +23,15 @@ export const Route = createFileRoute("/ledger")({
 
 type View = "wins" | "highScore" | "birds";
 
+// The keys we allow users to sort the table by
+type SortKey = "wins" | "games" | "win_rate" | "average" | "total";
+
 const viewOptions = [
   { value: "wins", label: "Total Wins per Player" },
   { value: "highScore", label: "High Scores" },
   { value: "birds", label: "Most Played Bird" },
 ];
 
-// --- Types matching the Python API ---
 export interface LedgerRecord {
   name: string;
   username: string;
@@ -54,7 +51,6 @@ export interface PlayerHighScoreData {
   date: string | number;
 }
 
-// New Interface for ties
 export interface AchieverDetail {
   name: string;
   date: string | number;
@@ -63,7 +59,7 @@ export interface AchieverDetail {
 export interface RecordHighScore {
   name: string;
   score: number;
-  achievers: AchieverDetail[]; // Changed from a single string to an array
+  achievers: AchieverDetail[];
 }
 
 export interface HighScoreReturn {
@@ -71,12 +67,12 @@ export interface HighScoreReturn {
   overall: RecordHighScore[];
 }
 
-// Simple in-memory caches to store API responses
 const ledgerCache = new Map<string, LedgerRecord[]>();
 const highScoreCache = new Map<string, HighScoreReturn>();
 
 function LedgerPage() {
   const [view, setView] = useState<View>("wins");
+  const [sortKey, setSortKey] = useState<SortKey>("wins");
 
   // Ledger State
   const [ledgerData, setLedgerData] = useState<LedgerRecord[]>([]);
@@ -93,19 +89,19 @@ function LedgerPage() {
   const select_win_rate = ["OVERALL", "2 PLAYER", "3 PLAYER", "4 PLAYER"];
 
   const win_rate_clicked = () => {
-    setWinRatePlayerCount((winRatePlayerCount) => (winRatePlayerCount + 1) % 4);
+    setWinRatePlayerCount((prev) => (prev + 1) % 4);
+    // If they click the win rate header, automatically sort by it
+    handleSort("win_rate");
   };
 
-  // Fetch all API data when the component mounts
   useEffect(() => {
     const fetchAllData = async () => {
-      // 1. Check the caches FIRST
       if (ledgerCache.has("ledgerData") && highScoreCache.has("highScoreData")) {
         setLedgerData(ledgerCache.get("ledgerData")!);
         setHighScoreData(highScoreCache.get("highScoreData")!);
         setIsLoading(false);
         setIsHighScoreLoading(false);
-        return; // Exit early, no API call needed!
+        return;
       }
 
       setIsLoading(true);
@@ -131,12 +127,11 @@ function LedgerPage() {
         const ledgerDataRaw: LedgerRecord[] = await ledgerRes.json();
         const highDataRaw: HighScoreReturn = await highRes.json();
 
-        // 2. Sort ledger data and save to state AND cache
+        // Default sort is by wins
         const sortedLedger = ledgerDataRaw.sort((a, b) => b.wins - a.wins);
         setLedgerData(sortedLedger);
         ledgerCache.set("ledgerData", sortedLedger);
 
-        // 3. Sort personal records and save to state AND cache
         highDataRaw.personal.sort((a, b) => b.score - a.score);
         setHighScoreData(highDataRaw);
         highScoreCache.set("highScoreData", highDataRaw);
@@ -153,10 +148,25 @@ function LedgerPage() {
     fetchAllData();
   }, []);
 
-  // Helper to cleanly format string/int dates from the API
+  // Handle Sorting Logic
+  const handleSort = (key: SortKey) => {
+    setSortKey(key);
+    
+    // Create a new array to trigger a re-render
+    const sorted = [...ledgerData].sort((a, b) => {
+      // If we are sorting by win rate and viewing a specific player count, use that specific metric
+      if (key === "win_rate") {
+        const aRate = [a.win_rate, a.win_rate_2p ?? 0, a.win_rate_3p ?? 0, a.win_rate_4p ?? 0][winRatePlayerCount];
+        const bRate = [b.win_rate, b.win_rate_2p ?? 0, b.win_rate_3p ?? 0, b.win_rate_4p ?? 0][winRatePlayerCount];
+        return bRate - aRate;
+      }
+      return b[key] - a[key];
+    });
+    setLedgerData(sorted);
+  };
+
   const formatDate = (dateVal: string | number | undefined) => {
     if (!dateVal) return "No date found";
-    // If it's a raw date string without a time, append T00:00:00 to prevent timezone shift bugs
     const dateStr = String(dateVal).includes("T") ? String(dateVal) : `${dateVal}T00:00:00`;
     return new Date(dateStr).toLocaleDateString("en-US", {
       month: "long",
@@ -199,56 +209,108 @@ function LedgerPage() {
           ) : (
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/60 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  <th className="px-4 py-4 sm:px-6">Player</th>
-                  <th className="px-4 py-4 text-right">Wins</th>
-                  <th className="hidden px-4 py-4 text-right sm:table-cell">Games</th>
-                  <th className="px-4 py-4 text-right">
-                    <button
-                      onClick={win_rate_clicked}
-                      className="hover:text-primary transition-colors"
+                <tr className="border-b border-border bg-muted/60 text-xs font-bold uppercase tracking-widest text-muted-foreground [&>th]:px-4 [&>th]:py-4">
+                  <th className="sm:px-6">Player</th>
+                  
+                  {/* Wins Header */}
+                  <th className="text-right">
+                    <button 
+                      onClick={() => handleSort("wins")}
+                      className={`inline-flex items-center gap-1 hover:text-primary transition-colors ${sortKey === "wins" ? "text-primary" : ""}`}
                     >
-                      {select_win_rate[winRatePlayerCount]} WIN RATE
+                      WINS {sortKey === "wins" && <ArrowDownWideNarrow className="h-3 w-3" />}
                     </button>
                   </th>
-                  <th className="hidden px-4 py-4 text-right sm:table-cell">Avg Score</th>
-                  <th className="hidden px-4 py-4 text-right md:table-cell">Total Score</th>
+
+                  {/* Games Header */}
+                  <th className="hidden text-right sm:table-cell">
+                    <button 
+                      onClick={() => handleSort("games")}
+                      className={`inline-flex items-center gap-1 hover:text-primary transition-colors ${sortKey === "games" ? "text-primary" : ""}`}
+                    >
+                      GAMES {sortKey === "games" && <ArrowDownWideNarrow className="h-3 w-3" />}
+                    </button>
+                  </th>
+
+                  {/* Win Rate Header */}
+                  <th className="text-right">
+                    <button
+                      onClick={win_rate_clicked}
+                      className={`inline-flex items-center gap-1 hover:text-primary transition-colors ${sortKey === "win_rate" ? "text-primary" : ""}`}
+                    >
+                      {select_win_rate[winRatePlayerCount]} WIN RATE
+                      {sortKey === "win_rate" && <ArrowDownWideNarrow className="h-3 w-3" />}
+                    </button>
+                  </th>
+
+                  {/* Average Score Header */}
+                  <th className="hidden text-right sm:table-cell">
+                    <button 
+                      onClick={() => handleSort("average")}
+                      className={`inline-flex items-center gap-1 hover:text-primary transition-colors ${sortKey === "average" ? "text-primary" : ""}`}
+                    >
+                      AVG SCORE {sortKey === "average" && <ArrowDownWideNarrow className="h-3 w-3" />}
+                    </button>
+                  </th>
+
+                  {/* Total Score Header */}
+                  <th className="hidden text-right md:table-cell">
+                    <button 
+                      onClick={() => handleSort("total")}
+                      className={`inline-flex items-center gap-1 hover:text-primary transition-colors ${sortKey === "total" ? "text-primary" : ""}`}
+                    >
+                      TOTAL SCORE {sortKey === "total" && <ArrowDownWideNarrow className="h-3 w-3" />}
+                    </button>
+                  </th>
+
                 </tr>
               </thead>
-              <tbody>
-                {ledgerData.map((s, i) => (
-                  <tr key={s.username} className="border-b border-border/60 last:border-0">
-                    <td className="px-4 py-4 sm:px-6">
-                      <span className="flex items-center gap-3 font-semibold">
-                        <span
-                          className="h-3 w-3 rounded-full"
-                          style={{ backgroundColor: playerColors[s.name] || "var(--chart-5)" }}
-                        />
-                        {s.name}
-                        {i === 0 && <Trophy className="h-4 w-4 text-nectar" />}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right font-serif text-lg font-semibold">
-                      {s.wins}
-                    </td>
-                    <td className="hidden px-4 py-4 text-right text-muted-foreground sm:table-cell">
-                      {s.games}
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      {
-                        [s.win_rate, s.win_rate_2p ?? 0, s.win_rate_3p ?? 0, s.win_rate_4p ?? 0][
-                          winRatePlayerCount
-                        ]
-                      }
-                      %
-                    </td>
-                    <td className="hidden px-4 py-4 text-right sm:table-cell">{s.average}</td>
-                    <td className="hidden px-4 py-4 text-right md:table-cell">
-                      {s.total.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              
+              {/* Animated Table Body */}
+              <motion.tbody layout>
+                <AnimatePresence>
+                  {ledgerData.map((s, i) => (
+                    <motion.tr 
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 150, damping: 30 }}
+                      key={s.username} 
+                      className="border-b border-border/60 last:border-0 [&>td]:px-4 [&>td]:py-4"
+                    >
+                      <td className="sm:px-6">
+                        <span className="flex items-center gap-3 font-semibold">
+                          <span
+                            className="h-3 w-3 rounded-full shrink-0"
+                            style={{ backgroundColor: playerColors[s.name] || "var(--chart-5)" }}
+                          />
+                          {s.name}
+                          {i === 0 && <Trophy className="h-4 w-4 text-nectar shrink-0" />}
+                        </span>
+                      </td>
+                      <td className="text-right font-serif text-lg font-semibold">
+                        {s.wins}
+                      </td>
+                      <td className="hidden text-right text-muted-foreground sm:table-cell">
+                        {s.games}
+                      </td>
+                      <td className="text-right">
+                        {
+                          [s.win_rate, s.win_rate_2p ?? 0, s.win_rate_3p ?? 0, s.win_rate_4p ?? 0][
+                            winRatePlayerCount
+                          ]
+                        }
+                        %
+                      </td>
+                      <td className="hidden text-right sm:table-cell">{s.average}</td>
+                      <td className="hidden text-right md:table-cell">
+                        {s.total.toLocaleString()}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </motion.tbody>
             </table>
           )}
         </div>
@@ -331,8 +393,7 @@ function LedgerPage() {
           )}
         </div>
       )}
-
-      {/* Most Played Birds View (Mock Data) */}
+      
       {view === "birds" && (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {mostPlayedBirds.map((b, i) => (
@@ -357,6 +418,7 @@ function LedgerPage() {
           ))}
         </div>
       )}
+
     </div>
   );
 }
