@@ -2,3 +2,5 @@ fastapi
 pydantic
 pymssql
 python-dotenv
+pandas
+scikit-learn
