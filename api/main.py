@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes.ledger import router as ledger_router
 from api.routes.trend import router as trend_router 
 from api.routes.high_score import router as high_score_router 
+from api.routes.oracle import router as oracle_router
 
 app = FastAPI()
 
@@ -26,3 +27,4 @@ app.add_middleware(
 app.include_router(ledger_router)
 app.include_router(trend_router)
 app.include_router(high_score_router)
+app.include_router(oracle_router)

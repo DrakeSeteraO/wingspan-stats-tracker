@@ -151,13 +151,17 @@ function LedgerPage() {
   // Handle Sorting Logic
   const handleSort = (key: SortKey) => {
     setSortKey(key);
-    
+
     // Create a new array to trigger a re-render
     const sorted = [...ledgerData].sort((a, b) => {
       // If we are sorting by win rate and viewing a specific player count, use that specific metric
       if (key === "win_rate") {
-        const aRate = [a.win_rate, a.win_rate_2p ?? 0, a.win_rate_3p ?? 0, a.win_rate_4p ?? 0][winRatePlayerCount];
-        const bRate = [b.win_rate, b.win_rate_2p ?? 0, b.win_rate_3p ?? 0, b.win_rate_4p ?? 0][winRatePlayerCount];
+        const aRate = [a.win_rate, a.win_rate_2p ?? 0, a.win_rate_3p ?? 0, a.win_rate_4p ?? 0][
+          winRatePlayerCount
+        ];
+        const bRate = [b.win_rate, b.win_rate_2p ?? 0, b.win_rate_3p ?? 0, b.win_rate_4p ?? 0][
+          winRatePlayerCount
+        ];
         return bRate - aRate;
       }
       return b[key] - a[key];
@@ -211,10 +215,10 @@ function LedgerPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/60 text-xs font-bold uppercase tracking-widest text-muted-foreground [&>th]:px-4 [&>th]:py-4">
                   <th className="sm:px-6">Player</th>
-                  
+
                   {/* Wins Header */}
                   <th className="text-right">
-                    <button 
+                    <button
                       onClick={() => handleSort("wins")}
                       className={`inline-flex items-center gap-1 hover:text-primary transition-colors ${sortKey === "wins" ? "text-primary" : ""}`}
                     >
@@ -224,7 +228,7 @@ function LedgerPage() {
 
                   {/* Games Header */}
                   <th className="hidden text-right sm:table-cell">
-                    <button 
+                    <button
                       onClick={() => handleSort("games")}
                       className={`inline-flex items-center gap-1 hover:text-primary transition-colors ${sortKey === "games" ? "text-primary" : ""}`}
                     >
@@ -245,38 +249,39 @@ function LedgerPage() {
 
                   {/* Average Score Header */}
                   <th className="hidden text-right sm:table-cell">
-                    <button 
+                    <button
                       onClick={() => handleSort("average")}
                       className={`inline-flex items-center gap-1 hover:text-primary transition-colors ${sortKey === "average" ? "text-primary" : ""}`}
                     >
-                      AVG SCORE {sortKey === "average" && <ArrowDownWideNarrow className="h-3 w-3" />}
+                      AVG SCORE{" "}
+                      {sortKey === "average" && <ArrowDownWideNarrow className="h-3 w-3" />}
                     </button>
                   </th>
 
                   {/* Total Score Header */}
                   <th className="hidden text-right md:table-cell">
-                    <button 
+                    <button
                       onClick={() => handleSort("total")}
                       className={`inline-flex items-center gap-1 hover:text-primary transition-colors ${sortKey === "total" ? "text-primary" : ""}`}
                     >
-                      TOTAL SCORE {sortKey === "total" && <ArrowDownWideNarrow className="h-3 w-3" />}
+                      TOTAL SCORE{" "}
+                      {sortKey === "total" && <ArrowDownWideNarrow className="h-3 w-3" />}
                     </button>
                   </th>
-
                 </tr>
               </thead>
-              
+
               {/* Animated Table Body */}
               <motion.tbody layout>
                 <AnimatePresence>
                   {ledgerData.map((s, i) => (
-                    <motion.tr 
+                    <motion.tr
                       layout
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ type: "spring", stiffness: 150, damping: 30 }}
-                      key={s.username} 
+                      key={s.username}
                       className="border-b border-border/60 last:border-0 [&>td]:px-4 [&>td]:py-4"
                     >
                       <td className="sm:px-6">
@@ -289,9 +294,7 @@ function LedgerPage() {
                           {i === 0 && <Trophy className="h-4 w-4 text-nectar shrink-0" />}
                         </span>
                       </td>
-                      <td className="text-right font-serif text-lg font-semibold">
-                        {s.wins}
-                      </td>
+                      <td className="text-right font-serif text-lg font-semibold">{s.wins}</td>
                       <td className="hidden text-right text-muted-foreground sm:table-cell">
                         {s.games}
                       </td>
@@ -393,7 +396,7 @@ function LedgerPage() {
           )}
         </div>
       )}
-      
+
       {view === "birds" && (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {mostPlayedBirds.map((b, i) => (
@@ -418,7 +421,6 @@ function LedgerPage() {
           ))}
         </div>
       )}
-
     </div>
   );
 }

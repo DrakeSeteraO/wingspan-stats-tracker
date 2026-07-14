@@ -63,3 +63,17 @@ class RecordHighScore(BaseModel):
 class HighScoreReturn(BaseModel):
     personal: List[PlayerHighScoreData]
     overall: List[RecordHighScore]
+
+
+class Prediction(BaseModel):
+    title: str
+    player: str
+    value: str
+    confidence: int
+    note: str
+
+
+class OracleReturn(BaseModel):
+    nextGamePoints: List[Prediction]
+    nextWinner: List[Prediction]
+    eggCount: List[Prediction]
