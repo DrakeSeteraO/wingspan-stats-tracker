@@ -89,9 +89,10 @@ function LedgerPage() {
   const select_win_rate = ["OVERALL", "2 PLAYER", "3 PLAYER", "4 PLAYER"];
 
   const win_rate_clicked = () => {
-    setWinRatePlayerCount((prev) => (prev + 1) % 4);
-    // If they click the win rate header, automatically sort by it
-    handleSort("win_rate");
+    const nextCount = (winRatePlayerCount + 1) % 4;
+    setWinRatePlayerCount(nextCount);
+    // Pass the calculated next count directly into the sort function
+    handleSort("win_rate", nextCount);
   };
 
   useEffect(() => {
@@ -149,22 +150,23 @@ function LedgerPage() {
   }, []);
 
   // Handle Sorting Logic
-  const handleSort = (key: SortKey) => {
+  const handleSort = (key: SortKey, overrideWinRateCount?: number) => {
     setSortKey(key);
 
-    // Create a new array to trigger a re-render
+    // Use the override if provided, otherwise fallback to the current state
+    const currentCount = overrideWinRateCount ?? winRatePlayerCount;
+
     const sorted = [...ledgerData].sort((a, b) => {
-      // If we are sorting by win rate and viewing a specific player count, use that specific metric
       if (key === "win_rate") {
         const aRate = [a.win_rate, a.win_rate_2p ?? 0, a.win_rate_3p ?? 0, a.win_rate_4p ?? 0][
-          winRatePlayerCount
+          currentCount
         ];
         const bRate = [b.win_rate, b.win_rate_2p ?? 0, b.win_rate_3p ?? 0, b.win_rate_4p ?? 0][
-          winRatePlayerCount
+          currentCount
         ];
-        return bRate - aRate;
+        return Number(bRate) - Number(aRate);
       }
-      return b[key] - a[key];
+      return Number(b[key]) - Number(a[key]);
     });
     setLedgerData(sorted);
   };
