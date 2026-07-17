@@ -68,7 +68,6 @@ def get_high_scores():
     """
 
     # 3. NEW: Flock Superlatives
-    # 3. NEW: Flock Superlatives
     superlatives_query = """
         -- 1. Heartbreak
         WITH Losers AS (
@@ -77,10 +76,11 @@ def get_high_scores():
             FROM game a JOIN player_game_stats b ON a.game_id = b.game_id JOIN player_info c ON b.player_id = c.player_id
             WHERE b.player_id != a.winner_id AND c.name != 'Unknown' AND b.total IS NOT NULL
         ),
-        -- 2. Blowout
+        -- 2. Blowout & Skin of Their Beak (Shared CTE)
         RankedScores AS (
+            -- We sort by total DESC, but if there's a tie, we force the actual winner into 1st place
             SELECT a.game_id, c.name, b.total, CONVERT(varchar, a.date, 23) as date,
-            ROW_NUMBER() OVER(PARTITION BY a.game_id ORDER BY b.total DESC) as place
+            ROW_NUMBER() OVER(PARTITION BY a.game_id ORDER BY b.total DESC, CASE WHEN a.winner_id = b.player_id THEN 1 ELSE 2 END ASC) as place
             FROM game a JOIN player_game_stats b ON a.game_id = b.game_id JOIN player_info c ON b.player_id = c.player_id
             WHERE c.name != 'Unknown' AND b.total IS NOT NULL
         ),
@@ -88,6 +88,12 @@ def get_high_scores():
             SELECT r1.name as achiever, (r1.total - r2.total) as margin, r1.date,
             ROW_NUMBER() OVER(ORDER BY (r1.total - r2.total) DESC, r1.date ASC) as rn
             FROM RankedScores r1 JOIN RankedScores r2 ON r1.game_id = r2.game_id AND r1.place = 1 AND r2.place = 2
+        ),
+        TightestWins AS (
+            SELECT r1.name as achiever, r1.total as score, r1.date,
+            ROW_NUMBER() OVER(ORDER BY r1.total DESC, r1.date ASC) as rn
+            FROM RankedScores r1 JOIN RankedScores r2 ON r1.game_id = r2.game_id AND r1.place = 1 AND r2.place = 2
+            WHERE r1.total = r2.total
         ),
         -- 3. Pacifist
         Winners AS (
@@ -138,6 +144,26 @@ def get_high_scores():
             (SQUARE(c1-mean) + SQUARE(c2-mean) + SQUARE(c3-mean) + SQUARE(c4-mean) + SQUARE(c5-mean) + SQUARE(c6-mean)) / 6.0 as variance,
             ROW_NUMBER() OVER(ORDER BY (SQUARE(c1-mean) + SQUARE(c2-mean) + SQUARE(c3-mean) + SQUARE(c4-mean) + SQUARE(c5-mean) + SQUARE(c6-mean)) / 6.0 ASC, date ASC) as rn
             FROM Means
+        ),
+        -- 6. Traditionalist
+        Traditionalist AS (
+            SELECT c.name as achiever, b.total as score, CONVERT(varchar, a.date, 23) as date,
+            ROW_NUMBER() OVER(ORDER BY b.total DESC, a.date ASC) as rn
+            FROM game a JOIN player_game_stats b ON a.game_id = b.game_id JOIN player_info c ON b.player_id = c.player_id
+            WHERE c.name != 'Unknown' AND b.nectar = 0 AND b.total > 0
+        ),
+        -- 7. Egg Carton
+        GameMinBirds AS (
+            SELECT game_id, MIN(bird) as min_bird FROM player_game_stats GROUP BY game_id
+        ),
+        EggCarton AS (
+            SELECT c.name as achiever, b.total as score, CONVERT(varchar, a.date, 23) as date,
+            ROW_NUMBER() OVER(ORDER BY b.total DESC, a.date ASC) as rn
+            FROM game a
+            JOIN player_game_stats b ON a.game_id = b.game_id
+            JOIN player_info c ON b.player_id = c.player_id
+            JOIN GameMinBirds gmb ON a.game_id = gmb.game_id
+            WHERE a.winner_id = b.player_id AND b.bird = gmb.min_bird AND c.name != 'Unknown' AND b.total > 0
         )
 
         -- Combine All
@@ -149,7 +175,13 @@ def get_high_scores():
         UNION ALL
         SELECT 'Hyper-Specialist' as title, CAST(pct AS VARCHAR) + '% of total' as value, achiever, date, 'Highest percentage of points from a single category (' + Category + ').' as note FROM Percentages WHERE rn = 1
         UNION ALL
-        SELECT 'The All-Rounder' as title, CAST(CAST(ROUND(variance, 2) AS DECIMAL(10,2)) AS VARCHAR) as value, achiever, date, 'Most balanced scoring across all core categories (shown as statistical variance).' as note FROM Variances WHERE rn = 1;
+        SELECT 'The All-Rounder' as title, CAST(CAST(ROUND(variance, 2) AS DECIMAL(10,2)) AS VARCHAR) as value, achiever, date, 'Most balanced scoring across all core categories (shown as statistical variance).' as note FROM Variances WHERE rn = 1
+        UNION ALL
+        SELECT 'Skin of Their Beak' as title, CAST(score AS VARCHAR) + ' pts' as value, achiever, date, 'Highest-scoring victory won by a food tiebreaker (0 pt margin).' as note FROM TightestWins WHERE rn = 1
+        UNION ALL
+        SELECT 'The Traditionalist' as title, CAST(score AS VARCHAR) + ' pts' as value, achiever, date, 'Highest winning score achieved with exactly 0 Nectar.' as note FROM Traditionalist WHERE rn = 1
+        UNION ALL
+        SELECT 'The Egg Carton' as title, CAST(score AS VARCHAR) + ' pts' as value, achiever, date, 'Highest-scoring victory achieved while having the lowest Bird Points at the table.' as note FROM EggCarton WHERE rn = 1;
     """
     
     try:
