@@ -77,3 +77,17 @@ class OracleReturn(BaseModel):
     nextGamePoints: List[Prediction]
     nextWinner: List[Prediction]
     eggCount: List[Prediction]
+    
+
+class SuperlativeRecord(BaseModel):
+    title: str
+    value: str
+    achiever: str
+    date: Union[str, int]
+    note: str
+
+
+class HighScoreReturn(BaseModel):
+    personal: List[PlayerHighScoreData]
+    overall: List[RecordHighScore]
+    superlatives: List[SuperlativeRecord]

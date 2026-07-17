@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Egg, Feather, Trophy, ArrowDownWideNarrow } from "lucide-react";
+import { Egg, Feather, Trophy, ArrowDownWideNarrow, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MetricSelect } from "../components/MetricSelect";
@@ -65,6 +65,20 @@ export interface RecordHighScore {
 export interface HighScoreReturn {
   personal: PlayerHighScoreData[];
   overall: RecordHighScore[];
+}
+
+export interface SuperlativeRecord {
+  title: string;
+  value: string;
+  achiever: string;
+  date: string | number;
+  note: string;
+}
+
+export interface HighScoreReturn {
+  personal: PlayerHighScoreData[];
+  overall: RecordHighScore[];
+  superlatives: SuperlativeRecord[]; // New array
 }
 
 const ledgerCache = new Map<string, LedgerRecord[]>();
@@ -389,6 +403,35 @@ function LedgerPage() {
                             </p>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 3. Flock Superlatives Section */}
+                <h2 className="mt-12 text-2xl font-semibold">Flock Superlatives</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {highScoreData.superlatives.map((s) => (
+                    <div key={s.title} className="field-card p-6 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-primary">{s.title}</span>
+                          <Sparkles className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <p className="mt-2 font-serif text-3xl font-semibold">{s.value}</p>
+                        <p className="mt-2 text-sm italic text-muted-foreground">"{s.note}"</p>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-border/60">
+                        <p className="text-sm font-semibold flex items-center gap-2">
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{
+                              backgroundColor: playerColors[s.achiever] || "var(--chart-5)",
+                            }}
+                          />
+                          {s.achiever}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">{formatDate(s.date)}</p>
                       </div>
                     </div>
                   ))}
