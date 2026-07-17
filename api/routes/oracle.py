@@ -2,10 +2,7 @@ from fastapi import APIRouter, HTTPException
 import pymssql
 import os
 import math
-import numpy as np
-import pandas as pd
 from datetime import datetime
-from sklearn.linear_model import LinearRegression, LogisticRegression
 from dotenv import load_dotenv
 from api.schema import OracleReturn, Prediction
 
@@ -17,11 +14,32 @@ DATABASE = os.getenv('DATABASE')
 USERNAME = os.getenv('API_USERNAME')
 PASSWORD = os.getenv('API_PASSWORD')
 
+# --- Pure Python Machine Learning Math ---
+def simple_linear_regression(x_vals, y_vals):
+    """Calculates the line of best fit (slope and intercept) without scikit-learn."""
+    n = len(x_vals)
+    if n == 0: return 0, 0
+    mean_x = sum(x_vals) / n
+    mean_y = sum(y_vals) / n
+    
+    numerator = sum((x - mean_x) * (y - mean_y) for x, y in zip(x_vals, y_vals))
+    denominator = sum((x - mean_x) ** 2 for x in x_vals)
+    
+    slope = numerator / denominator if denominator != 0 else 0
+    intercept = mean_y - slope * mean_x
+    return slope, intercept
+
+def calculate_rmse(y_actual, y_predicted):
+    """Calculates Root Mean Squared Error to determine prediction confidence."""
+    if not y_actual: return 0
+    mse = sum((act - pred) ** 2 for act, pred in zip(y_actual, y_predicted)) / len(y_actual)
+    return math.sqrt(mse)
+
 @router.get("/api/oracle", response_model=OracleReturn, response_model_exclude_none=True)
 def get_predictions():
-    # Added 's.eggs' to the SQL query to pull the necessary data
+    # Pulled date formatting directly into SQL to avoid Pandas datetime conversions
     sql_query = """
-        SELECT p.name, s.total as score, s.eggs, g.date, g.player_count,
+        SELECT p.name, s.total as score, s.eggs, CONVERT(varchar, g.date, 23) as date, g.player_count,
                CASE WHEN g.winner_id = p.player_id THEN 1 ELSE 0 END as is_winner
         FROM player_game_stats s
         JOIN game g ON s.game_id = g.game_id
@@ -37,65 +55,68 @@ def get_predictions():
         rows = cursor.fetchall()
         conn.close()
 
-        df = pd.DataFrame(rows)
-        if df.empty:
-            return OracleReturn(nextGamePoints=[], nextWinner=[], eggCount=[])
-
-        df['date'] = pd.to_datetime(df['date'])
+        # Group data by player (Replaces pandas groupby)
+        player_data = {}
+        for row in rows:
+            name = row['name']
+            if name not in player_data:
+                player_data[name] = []
+            player_data[name].append(row)
         
         points_predictions = []
         winner_predictions = []
         egg_predictions = []
 
-        for name, group in df.groupby('name'):
-            group = group.copy().reset_index(drop=True)
+        for name, group in player_data.items():
             n_games = len(group)
-            
             if n_games < 5:
                 continue
 
             # --- 1. Feature Engineering ---
-            group['rolling_avg_pts'] = group['score'].shift(1).rolling(window=3, min_periods=1).mean()
-            group['rolling_avg_eggs'] = group['eggs'].shift(1).rolling(window=3, min_periods=1).mean()
-            group['days_since_last'] = group['date'].diff().dt.days.fillna(0)
+            scores = [g['score'] for g in group]
+            eggs = [g['eggs'] for g in group]
+            dates = [datetime.strptime(g['date'], "%Y-%m-%d") for g in group]
+            is_winner = [g['is_winner'] for g in group]
             
-            train_df = group.dropna().copy()
-            if len(train_df) < 4:
-                continue
-                
-            # Future Features for the X_pred matrix
-            next_player_count = int(group['player_count'].mode()[0])
-            next_rolling_pts = group['score'].tail(3).mean()
-            next_rolling_eggs = group['eggs'].tail(3).mean()
-            days_since_last = (datetime.now() - group['date'].iloc[-1]).days
+            # Calculate rolling averages (window=3)
+            rolling_avg_pts = []
+            rolling_avg_eggs = []
+            for i in range(n_games):
+                start_idx = max(0, i - 3)
+                rolling_avg_pts.append(sum(scores[start_idx:i]) / max(1, i - start_idx))
+                rolling_avg_eggs.append(sum(eggs[start_idx:i]) / max(1, i - start_idx))
 
-            X_base = train_df[['player_count', 'days_since_last']]
+            # Future Features for the X_pred matrix
+            next_rolling_pts = sum(scores[-3:]) / min(3, len(scores))
+            next_rolling_eggs = sum(eggs[-3:]) / min(3, len(eggs))
+
+            # Drop the first game from training since its rolling average is 0
+            train_scores = scores[1:]
+            train_eggs = eggs[1:]
+            train_rolling_pts = rolling_avg_pts[1:]
+            train_rolling_eggs = rolling_avg_eggs[1:]
 
             # ==========================================
             # MODEL 1: Estimated Points (Linear Regression)
             # ==========================================
-            X_pts = X_base.copy()
-            X_pts['rolling_avg_pts'] = train_df['rolling_avg_pts']
-            y_pts = train_df['score']
-
-            model_pts = LinearRegression().fit(X_pts, y_pts)
+            slope_pts, intercept_pts = simple_linear_regression(train_rolling_pts, train_scores)
             
-            X_pred_pts = pd.DataFrame({
-                'player_count': [next_player_count],
-                'days_since_last': [days_since_last],
-                'rolling_avg_pts': [next_rolling_pts]
-            })
+            # Inference
+            pred_pts = (slope_pts * next_rolling_pts) + intercept_pts
             
-            pred_pts = model_pts.predict(X_pred_pts)[0]
-            rmse_pts = math.sqrt(np.mean((y_pts - model_pts.predict(X_pts)) ** 2))
-            cv_pts = rmse_pts / y_pts.mean() if y_pts.mean() > 0 else 0
+            # Confidence (RMSE)
+            y_pred_pts = [(slope_pts * x) + intercept_pts for x in train_rolling_pts]
+            rmse_pts = calculate_rmse(train_scores, y_pred_pts)
+            mean_pts = sum(train_scores) / len(train_scores)
+            cv_pts = rmse_pts / mean_pts if mean_pts > 0 else 0
             conf_pts = max(10, min(99, int(100 - (cv_pts * 300))))
 
-            recent_wins = group['is_winner'].tail(3).sum()
+            # Quotes
+            recent_wins = sum(is_winner[-3:])
             if recent_wins >= 2:
                 pts_quote = f"Hot streak: {recent_wins} wins in the last 3 games."
-            elif model_pts.coef_[0] < -3.0: 
-                pts_quote = f"Board congestion penalty: struggles statistically in {next_player_count}-player matches."
+            elif slope_pts < 0: 
+                pts_quote = "Struggling to maintain momentum; scores are trending inversely to recent averages."
             elif rmse_pts < 5:
                 pts_quote = "Highly predictable engine: extremely low variance in final scores."
             else:
@@ -109,28 +130,21 @@ def get_predictions():
             # ==========================================
             # MODEL 2: Expected Eggs (Linear Regression)
             # ==========================================
-            X_eggs = X_base.copy()
-            X_eggs['rolling_avg_eggs'] = train_df['rolling_avg_eggs']
-            y_eggs = train_df['eggs']
-
-            model_eggs = LinearRegression().fit(X_eggs, y_eggs)
+            slope_eggs, intercept_eggs = simple_linear_regression(train_rolling_eggs, train_eggs)
             
-            X_pred_eggs = pd.DataFrame({
-                'player_count': [next_player_count],
-                'days_since_last': [days_since_last],
-                'rolling_avg_eggs': [next_rolling_eggs]
-            })
+            pred_eggs = max(0, (slope_eggs * next_rolling_eggs) + intercept_eggs)
             
-            pred_eggs = max(0, model_eggs.predict(X_pred_eggs)[0]) # Eggs can't be negative
-            rmse_eggs = math.sqrt(np.mean((y_eggs - model_eggs.predict(X_eggs)) ** 2))
-            cv_eggs = rmse_eggs / y_eggs.mean() if y_eggs.mean() > 0 else 0
+            y_pred_eggs = [(slope_eggs * x) + intercept_eggs for x in train_rolling_eggs]
+            rmse_eggs = calculate_rmse(train_eggs, y_pred_eggs)
+            mean_eggs = sum(train_eggs) / len(train_eggs)
+            cv_eggs = rmse_eggs / mean_eggs if mean_eggs > 0 else 0
             conf_eggs = max(10, min(99, int(100 - (cv_eggs * 300))))
 
             if pred_eggs > 18:
                 egg_quote = "Egg-laying engine builder supreme."
             elif rmse_eggs < 3:
                 egg_quote = "Extremely consistent clutch sizes across recent games."
-            elif model_eggs.coef_[2] > 0.8: # Positive correlation with rolling average
+            elif slope_eggs > 0.8:
                 egg_quote = "Improving clutch sizes each week."
             else:
                 egg_quote = "Expected to pull standard grassland yields."
@@ -141,21 +155,13 @@ def get_predictions():
             ))
 
             # ==========================================
-            # MODEL 3: Predicted Winner (Logistic Regression)
+            # MODEL 3: Predicted Winner (Weighted Probability)
             # ==========================================
-            y_win = train_df['is_winner']
+            # Pure Python approximation of Logistic Regression using an exponentially decaying win rate
+            weights = [1, 1.5, 2, 2.5, 3][:len(is_winner[-5:])]
+            weighted_wins = sum(w * act for w, act in zip(weights, is_winner[-5:]))
+            prob_win = weighted_wins / sum(weights) if sum(weights) > 0 else 0
             
-            # Logistic Regression crashes if a player has NEVER won or ALWAYS won in the dataset
-            # We must verify there are at least two distinct classes (0 and 1) before fitting
-            if len(y_win.unique()) > 1:
-                # class_weight='balanced' helps counteract the fact that players lose more games than they win
-                model_win = LogisticRegression(class_weight='balanced').fit(X_pts, y_win)
-                # Extract the probability of class '1' (Winning)
-                prob_win = model_win.predict_proba(X_pred_pts)[0][1]
-            else:
-                # If they've never won, we assign a baseline 0% (or 100% if they've never lost)
-                prob_win = float(y_win.iloc[0])
-
             win_pct = int(prob_win * 100)
 
             if win_pct > 40:
@@ -167,13 +173,11 @@ def get_predictions():
             else:
                 win_quote = "Solid mid-table probability for the upcoming match."
 
-            # We map the percentage directly to both the display value and the progress bar
             winner_predictions.append(Prediction(
                 title="Predicted Winner", player=name,
                 value=f"{win_pct}%", confidence=win_pct, note=win_quote
             ))
 
-        # We sort the winner predictions so the player with the highest probability appears first
         winner_predictions.sort(key=lambda x: x.confidence, reverse=True)
 
         return OracleReturn(
