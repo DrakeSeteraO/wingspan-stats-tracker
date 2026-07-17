@@ -381,6 +381,7 @@ function TrendsPage() {
                     dot={{ r: 4, strokeWidth: 2, fill: "var(--card)" }}
                     activeDot={{ r: 6 }}
                     animationDuration={700}
+                    connectNulls={true}
                   />
                 ))}
 

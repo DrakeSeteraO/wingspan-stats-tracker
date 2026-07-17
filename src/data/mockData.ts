@@ -17,7 +17,13 @@ export interface GameRecord {
   results: PlayerGameResult[];
 }
 
-export const players = ["Drake", "Anneliese"] as const;
+export const players = [
+  "Drake", 
+  "Anneliese",
+  "Palmer",
+  "Dolly",
+  "Aaron"
+] as const;
 export type PlayerName = (typeof players)[number];
 
 export const playerColors: Record<string, string> = {
