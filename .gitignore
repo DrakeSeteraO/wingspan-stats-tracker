@@ -9,6 +9,9 @@ game_export.CSV
 player_game_stats_export.CSV
 player_info_export.CSV
 
+# Create Posgres DB
+create_db.txt
+
 # Ignore the entire wingspan directory and all its contents
 Wingspan/
 # Logs
