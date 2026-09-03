@@ -84,3 +84,6 @@ db79f498-2308-4d70-b841-cc7046f94e7a.nakama-0
 51d61cc4-3a8a-4bc6-9463-3521cd07bbf8.nakama-0
 5206ff65-f5a2-4066-a8b2-0500b033dd67.nakama-1
 f521d2d6-06f2-47a2-af77-bd03b333befc.nakama-1
+6f148e1c-43a5-4fdb-b77e-d44afa2aa507.nakama-1
+7e865ba7-9491-4e42-bb81-b0f1eeac4bea.nakama-1
+db3fb967-3490-4095-8415-e5bc8fa4256f.nakama-1

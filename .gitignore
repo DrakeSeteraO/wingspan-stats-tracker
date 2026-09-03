@@ -4,6 +4,11 @@
 # Python env
 .venv
 
+# Azure Database CSV
+game_export.CSV
+player_game_stats_export.CSV
+player_info_export.CSV
+
 # Ignore the entire wingspan directory and all its contents
 Wingspan/
 # Logs
