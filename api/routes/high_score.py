@@ -24,7 +24,7 @@ def get_high_scores():
             SELECT 
                 c.name,
                 b.total as score,
-                CONVERT(varchar, a.date, 23) as date,
+                TO_CHAR(a.date, 'YYYY-MM-DD') as date,
                 ROW_NUMBER() OVER(PARTITION BY c.name ORDER BY b.total DESC, a.date ASC) as rn
             FROM game a
             JOIN player_game_stats b ON a.game_id = b.game_id
@@ -38,18 +38,18 @@ def get_high_scores():
     overall_query = """
         WITH UnpivotedStats AS (
             SELECT 
-                CONVERT(varchar, a.date, 23) as date,
+                TO_CHAR(a.date, 'YYYY-MM-DD') as date,
                 c.name as achiever, Category, Score
             FROM game a
             JOIN player_game_stats b ON a.game_id = b.game_id
             JOIN player_info c ON b.player_id = c.player_id
-            CROSS APPLY (
+            CROSS JOIN LATERAL (
                 VALUES 
                     ('Total Points', b.total), ('Bird Points', b.bird),
                     ('Bonus Cards', b.bonus_card), ('End of Round Goals', b.end_of_round_goals),
                     ('Eggs', b.eggs), ('Food on Cards', b.food_on_cards),
                     ('Tucked Cards', b.tucked_cards), ('Nectar', b.nectar)
-            ) x (Category, Score)
+            ) as x (Category, Score)
             WHERE c.name != 'Unknown' AND Score IS NOT NULL
         ),
         PlayerScoreEarliest AS (
@@ -72,15 +72,14 @@ def get_high_scores():
     superlatives_query = """
         -- 1. Heartbreak
         WITH Losers AS (
-            SELECT c.name as achiever, b.total as score, CONVERT(varchar, a.date, 23) as date,
+            SELECT c.name as achiever, b.total as score, TO_CHAR(a.date, 'YYYY-MM-DD') as date,
             ROW_NUMBER() OVER(ORDER BY b.total DESC, a.date ASC) as rn
             FROM game a JOIN player_game_stats b ON a.game_id = b.game_id JOIN player_info c ON b.player_id = c.player_id
             WHERE b.player_id != a.winner_id AND c.name != 'Unknown' AND b.total IS NOT NULL
         ),
         -- 2. Blowout & Skin of Their Beak (Shared CTE)
         RankedScores AS (
-            -- We sort by total DESC, but if there's a tie, we force the actual winner into 1st place
-            SELECT a.game_id, c.name, b.total, CONVERT(varchar, a.date, 23) as date,
+            SELECT a.game_id, c.name, b.total, TO_CHAR(a.date, 'YYYY-MM-DD') as date,
             ROW_NUMBER() OVER(PARTITION BY a.game_id ORDER BY b.total DESC, CASE WHEN a.winner_id = b.player_id THEN 1 ELSE 2 END ASC) as place
             FROM game a JOIN player_game_stats b ON a.game_id = b.game_id JOIN player_info c ON b.player_id = c.player_id
             WHERE c.name != 'Unknown' AND b.total IS NOT NULL
@@ -98,7 +97,7 @@ def get_high_scores():
         ),
         -- 3. Pacifist
         Winners AS (
-            SELECT c.name as achiever, b.total as score, CONVERT(varchar, a.date, 23) as date,
+            SELECT c.name as achiever, b.total as score, TO_CHAR(a.date, 'YYYY-MM-DD') as date,
             ROW_NUMBER() OVER(ORDER BY b.total ASC, a.date ASC) as rn
             FROM game a JOIN player_game_stats b ON a.game_id = b.game_id JOIN player_info c ON b.player_id = c.player_id
             WHERE b.player_id = a.winner_id AND c.name != 'Unknown' AND b.total > 0
@@ -106,24 +105,24 @@ def get_high_scores():
         -- 4. Hyper-Specialist
         PlayerCategories AS (
             SELECT 
-                a.game_id, c.name as achiever, b.total, CONVERT(varchar, a.date, 23) as date,
+                a.game_id, c.name as achiever, b.total, TO_CHAR(a.date, 'YYYY-MM-DD') as date,
                 cat.Category, cat.Score,
                 ROW_NUMBER() OVER(PARTITION BY a.game_id, c.name ORDER BY cat.Score DESC) as cat_rn
             FROM game a 
             JOIN player_game_stats b ON a.game_id = b.game_id 
             JOIN player_info c ON b.player_id = c.player_id
-            CROSS APPLY (
+            CROSS JOIN LATERAL (
                 VALUES 
                     ('Bird Points', b.bird), ('Bonus Cards', b.bonus_card),
                     ('End of Round Goals', b.end_of_round_goals), ('Eggs', b.eggs),
                     ('Food on Cards', b.food_on_cards), ('Tucked Cards', b.tucked_cards),
                     ('Nectar', b.nectar)
-            ) cat (Category, Score)
+            ) as cat (Category, Score)
             WHERE c.name != 'Unknown' AND b.total > 0
         ),
         Percentages AS (
             SELECT 
-                achiever, CAST(ROUND((CAST(Score AS FLOAT) / total) * 100, 1) AS FLOAT) as pct, 
+                achiever, CAST(ROUND((CAST(Score AS NUMERIC) / total) * 100, 1) AS FLOAT) as pct, 
                 Category, date,
                 ROW_NUMBER() OVER(ORDER BY (CAST(Score AS FLOAT) / total) DESC, date ASC) as rn
             FROM PlayerCategories
@@ -131,7 +130,7 @@ def get_high_scores():
         ),
         -- 5. All-Rounder (Lowest Variance)
         CategoryStats AS (
-            SELECT a.game_id, c.name as achiever, CONVERT(varchar, a.date, 23) as date,
+            SELECT a.game_id, c.name as achiever, TO_CHAR(a.date, 'YYYY-MM-DD') as date,
             CAST(b.bird AS FLOAT) as c1, CAST(b.bonus_card AS FLOAT) as c2, CAST(b.end_of_round_goals AS FLOAT) as c3,
             CAST(b.eggs AS FLOAT) as c4, CAST(b.food_on_cards AS FLOAT) as c5, CAST(b.tucked_cards AS FLOAT) as c6
             FROM game a JOIN player_game_stats b ON a.game_id = b.game_id JOIN player_info c ON b.player_id = c.player_id
@@ -142,13 +141,13 @@ def get_high_scores():
         ),
         Variances AS (
             SELECT achiever, date,
-            (SQUARE(c1-mean) + SQUARE(c2-mean) + SQUARE(c3-mean) + SQUARE(c4-mean) + SQUARE(c5-mean) + SQUARE(c6-mean)) / 6.0 as variance,
-            ROW_NUMBER() OVER(ORDER BY (SQUARE(c1-mean) + SQUARE(c2-mean) + SQUARE(c3-mean) + SQUARE(c4-mean) + SQUARE(c5-mean) + SQUARE(c6-mean)) / 6.0 ASC, date ASC) as rn
+            (POWER(c1-mean, 2) + POWER(c2-mean, 2) + POWER(c3-mean, 2) + POWER(c4-mean, 2) + POWER(c5-mean, 2) + POWER(c6-mean, 2)) / 6.0 as variance,
+            ROW_NUMBER() OVER(ORDER BY (POWER(c1-mean, 2) + POWER(c2-mean, 2) + POWER(c3-mean, 2) + POWER(c4-mean, 2) + POWER(c5-mean, 2) + POWER(c6-mean, 2)) / 6.0 ASC, date ASC) as rn
             FROM Means
         ),
         -- 6. Traditionalist
         Traditionalist AS (
-            SELECT c.name as achiever, b.total as score, CONVERT(varchar, a.date, 23) as date,
+            SELECT c.name as achiever, b.total as score, TO_CHAR(a.date, 'YYYY-MM-DD') as date,
             ROW_NUMBER() OVER(ORDER BY b.total DESC, a.date ASC) as rn
             FROM game a JOIN player_game_stats b ON a.game_id = b.game_id JOIN player_info c ON b.player_id = c.player_id
             WHERE c.name != 'Unknown' AND b.nectar = 0 AND b.total > 0
@@ -158,7 +157,7 @@ def get_high_scores():
             SELECT game_id, MIN(bird) as min_bird FROM player_game_stats GROUP BY game_id
         ),
         EggCarton AS (
-            SELECT c.name as achiever, b.total as score, CONVERT(varchar, a.date, 23) as date,
+            SELECT c.name as achiever, b.total as score, TO_CHAR(a.date, 'YYYY-MM-DD') as date,
             ROW_NUMBER() OVER(ORDER BY b.total DESC, a.date ASC) as rn
             FROM game a
             JOIN player_game_stats b ON a.game_id = b.game_id
@@ -168,21 +167,21 @@ def get_high_scores():
         )
 
         -- Combine All
-        SELECT 'The Heartbreak' as title, CAST(score AS VARCHAR) + ' pts' as value, achiever, date, 'Highest score that still lost the game.' as note FROM Losers WHERE rn = 1
+        SELECT 'The Heartbreak' as title, CAST(score AS VARCHAR) || ' pts' as value, achiever, date, 'Highest score that still lost the game.' as note FROM Losers WHERE rn = 1
         UNION ALL
-        SELECT 'Biggest Blowout' as title, CAST(margin AS VARCHAR) + ' pt margin' as value, achiever, date, 'Largest point gap between 1st and 2nd place.' as note FROM Margins WHERE rn = 1
+        SELECT 'Biggest Blowout' as title, CAST(margin AS VARCHAR) || ' pt margin' as value, achiever, date, 'Largest point gap between 1st and 2nd place.' as note FROM Margins WHERE rn = 1
         UNION ALL
-        SELECT 'Pacifist Victory' as title, CAST(score AS VARCHAR) + ' pts' as value, achiever, date, 'Lowest total score to successfully win a game.' as note FROM Winners WHERE rn = 1
+        SELECT 'Pacifist Victory' as title, CAST(score AS VARCHAR) || ' pts' as value, achiever, date, 'Lowest total score to successfully win a game.' as note FROM Winners WHERE rn = 1
         UNION ALL
-        SELECT 'Hyper-Specialist' as title, CAST(pct AS VARCHAR) + '% of total' as value, achiever, date, 'Highest percentage of points from a single category (' + Category + ').' as note FROM Percentages WHERE rn = 1
+        SELECT 'Hyper-Specialist' as title, CAST(pct AS VARCHAR) || '% of total' as value, achiever, date, 'Highest percentage of points from a single category (' || Category || ').' as note FROM Percentages WHERE rn = 1
         UNION ALL
-        SELECT 'The All-Rounder' as title, CAST(CAST(ROUND(variance, 2) AS DECIMAL(10,2)) AS VARCHAR) as value, achiever, date, 'Most balanced scoring across all core categories (shown as statistical variance).' as note FROM Variances WHERE rn = 1
+        SELECT 'The All-Rounder' as title, CAST(CAST(ROUND(variance::numeric, 2) AS DECIMAL(10,2)) AS VARCHAR) as value, achiever, date, 'Most balanced scoring across all core categories (shown as statistical variance).' as note FROM Variances WHERE rn = 1
         UNION ALL
-        SELECT 'Skin of Their Beak' as title, CAST(score AS VARCHAR) + ' pts' as value, achiever, date, 'Highest-scoring victory won by a food tiebreaker (0 pt margin).' as note FROM TightestWins WHERE rn = 1
+        SELECT 'Skin of Their Beak' as title, CAST(score AS VARCHAR) || ' pts' as value, achiever, date, 'Highest-scoring victory won by a food tiebreaker (0 pt margin).' as note FROM TightestWins WHERE rn = 1
         UNION ALL
-        SELECT 'The Traditionalist' as title, CAST(score AS VARCHAR) + ' pts' as value, achiever, date, 'Highest winning score achieved with exactly 0 Nectar.' as note FROM Traditionalist WHERE rn = 1
+        SELECT 'The Traditionalist' as title, CAST(score AS VARCHAR) || ' pts' as value, achiever, date, 'Highest winning score achieved with exactly 0 Nectar.' as note FROM Traditionalist WHERE rn = 1
         UNION ALL
-        SELECT 'The Egg Carton' as title, CAST(score AS VARCHAR) + ' pts' as value, achiever, date, 'Highest-scoring victory achieved while having the lowest Bird Points at the table.' as note FROM EggCarton WHERE rn = 1;
+        SELECT 'The Egg Carton' as title, CAST(score AS VARCHAR) || ' pts' as value, achiever, date, 'Highest-scoring victory achieved while having the lowest Bird Points at the table.' as note FROM EggCarton WHERE rn = 1;
     """
     
     try:
@@ -213,7 +212,7 @@ def get_high_scores():
         return {
             "personal": personal_results,
             "overall": final_overall,
-            "superlatives": superlative_results # Append new list here
+            "superlatives": superlative_results
         }
 
     except Exception as e:

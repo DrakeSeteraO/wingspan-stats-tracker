@@ -14,7 +14,6 @@ router = APIRouter()
 
 load_dotenv()
 
-# --- Azure SQL Configuration ---
 SERVER = os.getenv('SERVER')
 DATABASE = os.getenv('DATABASE')
 USERNAME = os.getenv('API_USERNAME')
@@ -46,10 +45,10 @@ def get_stats(request: TrendRequest):
     allowed_intervals = {
         'game': 'g.game_id',
         'day': 'CAST(g.date AS DATE)',
-        'week': 'CAST(DATEADD(week, DATEDIFF(week, 0, g.date), 0) AS DATE)',
-        'month': "FORMAT(g.date, 'yyyy-MM')",
-        'year': "FORMAT(g.date, 'yyyy')",
-        'all': "'All-Time'" # Wrapped in single quotes to act as a SQL string literal
+        'week': "CAST(DATE_TRUNC('week', g.date) AS DATE)",
+        'month': "TO_CHAR(g.date, 'YYYY-MM')",
+        'year': "TO_CHAR(g.date, 'YYYY')",
+        'all': "'All-Time'" 
     }
 
     # Validate Inputs
@@ -115,44 +114,36 @@ def get_stats(request: TrendRequest):
         # --- Reformat Data for Frontend Graph ---
         formatted_dict = {}
         
-        # Map 'total' to 'totalPoints' to match your frontend example, otherwise use the requested score name
         metric_key = 'totalPoints' if request.score.lower() == 'total' else request.score
         
         for row in results:
             interval = row['time_interval']
             
-            # Initialize the interval group if it doesn't exist yet
             if interval not in formatted_dict:
                 formatted_dict[interval] = {
                     "date": str(interval),
                     "winner": None,
-                    "_max_score": -float('inf'), # Hidden temp key to calculate the winner
+                    "_max_score": -float('inf'), 
                     "results": []
                 }
             
-            # Handle potential None values from the database
             score = row['calculated_score'] if row['calculated_score'] is not None else 0
-            player_name = row['name'] # Using 'name' as requested in your target JSON (e.g., "Wren")
+            player_name = row['name'] 
             
-            # Append this player's stats to the results array
             formatted_dict[interval]["results"].append({
                 "player": player_name,
                 metric_key: score
             })
             
-            # Dynamically determine the winner for this interval
             if score > formatted_dict[interval]["_max_score"]:
                 formatted_dict[interval]["_max_score"] = score
                 formatted_dict[interval]["winner"] = player_name
                 
-        # Strip out the temporary max_score key, convert to a list, and assign sequential IDs
         final_output = []
         
-        # enumerate(..., start=1) automatically counts 1, 2, 3... for us
-        for index, (interval_key, data) in enumerate(formatted_dict.items(), start=1):
+        for index, (_, data) in enumerate(formatted_dict.items(), start=1):
             del data["_max_score"]
             
-            # Reconstruct the dictionary so 'id' appears at the top
             final_output.append({
                 "id": index,
                 **data

@@ -40,7 +40,7 @@ def calculate_rmse(y_actual, y_predicted):
 def get_predictions():
     # Pulled date formatting directly into SQL to avoid Pandas datetime conversions
     sql_query = """
-        SELECT p.name, s.total as score, s.eggs, CONVERT(varchar, g.date, 23) as date, g.player_count,
+        SELECT p.name, s.total as score, s.eggs, TO_CHAR(g.date, 'YYYY-MM-DD') as date, g.player_count,
                CASE WHEN g.winner_id = p.player_id THEN 1 ELSE 0 END as is_winner
         FROM player_game_stats s
         JOIN game g ON s.game_id = g.game_id
