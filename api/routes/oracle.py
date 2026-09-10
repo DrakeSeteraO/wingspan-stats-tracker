@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
-import pymssql
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import os
 import math
 from datetime import datetime
@@ -49,8 +50,8 @@ def get_predictions():
     """
 
     try:
-        conn = pymssql.connect(server=SERVER, user=USERNAME, password=PASSWORD, database=DATABASE)
-        cursor = conn.cursor(as_dict=True)
+        conn = psycopg2.connect(host=SERVER, user=USERNAME, password=PASSWORD, database=DATABASE)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute(sql_query)
         rows = cursor.fetchall()
         conn.close()

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
-import pymssql
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import os
 from dotenv import load_dotenv
 
@@ -185,8 +186,8 @@ def get_high_scores():
     """
     
     try:
-        conn = pymssql.connect(server=SERVER, user=USERNAME, password=PASSWORD, database=DATABASE)
-        cursor = conn.cursor(as_dict=True)
+        conn = psycopg2.connect(host=SERVER, user=USERNAME, password=PASSWORD, database=DATABASE)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         cursor.execute(personal_query)
         personal_results = cursor.fetchall()

@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
-import pymssql
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import os
 import sys
 from dotenv import load_dotenv
@@ -50,14 +51,9 @@ def get_ledger():
     """
 
     try:
-        conn = pymssql.connect(
-            server=SERVER,
-            user=USERNAME,
-            password=PASSWORD,
-            database=DATABASE
-        )
+        conn = psycopg2.connect(host=SERVER, user=USERNAME, password=PASSWORD, database=DATABASE)
         
-        cursor = conn.cursor(as_dict=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute(sql_query)
             
         results = cursor.fetchall()
