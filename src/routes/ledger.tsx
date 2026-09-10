@@ -315,11 +315,9 @@ function LedgerPage() {
                         {s.games}
                       </td>
                       <td className="text-right">
-                        {
-                          [s.win_rate, s.win_rate_2p ?? 0, s.win_rate_3p ?? 0, s.win_rate_4p ?? 0][
-                            winRatePlayerCount
-                          ]
-                        }
+                        {[s.win_rate, s.win_rate_2p ?? 0, s.win_rate_3p ?? 0, s.win_rate_4p ?? 0][
+                          winRatePlayerCount
+                        ] + "%"}
                       </td>
                       <td className="hidden text-right sm:table-cell">{Math.round(s.average)}</td>
                       <td className="hidden text-right md:table-cell">
