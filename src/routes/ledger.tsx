@@ -320,9 +320,8 @@ function LedgerPage() {
                             winRatePlayerCount
                           ]
                         }
-                        %
                       </td>
-                      <td className="hidden text-right sm:table-cell">{s.average}</td>
+                      <td className="hidden text-right sm:table-cell">{Math.round(s.average)}</td>
                       <td className="hidden text-right md:table-cell">
                         {s.total.toLocaleString()}
                       </td>
