@@ -50,7 +50,7 @@ def get_predictions():
     """
 
     try:
-        conn = psycopg2.connect(host=SERVER, user=USERNAME, password=PASSWORD, database=DATABASE)
+        conn = psycopg2.connect(host=SERVER, user=USERNAME, password=PASSWORD, dbname=DATABASE)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute(sql_query)
         rows = cursor.fetchall()
