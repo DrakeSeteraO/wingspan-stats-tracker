@@ -1,6 +1,6 @@
 import json
 import os
-import pyodbc
+import psycopg2
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -8,12 +8,11 @@ from dotenv import load_dotenv
 # Load variables from your .env file
 load_dotenv()
 
-# --- Azure SQL Configuration (Powered by .env) ---
+# --- PostgreSQL Configuration (Powered by .env) ---
 SERVER = os.getenv('SERVER')
-DATABASE = os.getenv('DATABASE')
+DATABASE = os.getenv('DATABASE', 'wingspan_db')
 USERNAME = os.getenv('UPLOAD_USERNAME')
 PASSWORD = os.getenv('UPLOAD_PASSWORD')
-DRIVER = os.getenv('DRIVER')
 
 # File Paths
 WINGSPAN_DOCS_DIR = Path("Wingspan/Container/Documents")
@@ -22,11 +21,10 @@ WINGSPAN_DOCS_DIR = Path("Wingspan/Container/Documents")
 SETTINGS_FILE_PATH = WINGSPAN_DOCS_DIR / "Settings.json" 
 
 def get_db_connection():
-    """Establish a connection to the Azure SQL Database."""
-    conn_str = f"DRIVER={DRIVER};SERVER={SERVER};PORT=1433;DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD}"
-    return pyodbc.connect(conn_str, autocommit=False)
+    """Establish a connection to the PostgreSQL Database."""
+    return psycopg2.connect(host=SERVER, dbname=DATABASE, user=USERNAME, password=PASSWORD)
 
-def update_azure_data():
+def update_postgres_data():
     if not WINGSPAN_DOCS_DIR.exists():
         print(f"❌ Error: Cannot locate directory path at '{WINGSPAN_DOCS_DIR}'")
         return
@@ -54,12 +52,12 @@ def update_azure_data():
     else:
         print(f"⚠️ Settings file not found at {SETTINGS_FILE_PATH}. Will fallback to file properties.")
 
-    print("🔌 Connecting to Azure SQL for Data Correction...")
+    print("🔌 Connecting to PostgreSQL for Data Correction...")
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         print("✅ Connected successfully!\n")
-    except pyodbc.Error as e:
+    except Exception as e:
         print(f"❌ Database connection failed: {e}")
         return
 
@@ -100,8 +98,8 @@ def update_azure_data():
 
                 cursor.execute("""
                     UPDATE player_info 
-                    SET username = ? 
-                    WHERE player_id = ?
+                    SET username = %s 
+                    WHERE player_id = %s
                 """, (p_username, p_id))
 
             # ---------------------------------------------------------
@@ -109,8 +107,8 @@ def update_azure_data():
             # ---------------------------------------------------------
             cursor.execute("""
                 UPDATE game 
-                SET date = ?, player_count = ?, winner_id = ? 
-                WHERE game_id = ?
+                SET date = %s, player_count = %s, winner_id = %s 
+                WHERE game_id = %s
             """, (game_date, len(players), winner_id, game_id))
 
             # ---------------------------------------------------------
@@ -130,9 +128,9 @@ def update_azure_data():
 
                 cursor.execute("""
                     UPDATE player_game_stats 
-                    SET total = ?, bird = ?, bonus_card = ?, end_of_round_goals = ?, 
-                        eggs = ?, food_on_cards = ?, tucked_cards = ?, nectar = ?
-                    WHERE player_id = ? AND game_id = ?
+                    SET total = %s, bird = %s, bonus_card = %s, end_of_round_goals = %s, 
+                        eggs = %s, food_on_cards = %s, tucked_cards = %s, nectar = %s
+                    WHERE player_id = %s AND game_id = %s
                 """, (total, bird_pts, bonus, eor, eggs, food, tucked, nectar, s_pid, game_id))
 
             # Commit the transaction to save the updates for this file
@@ -149,7 +147,7 @@ def update_azure_data():
     cursor.close()
     conn.close()
     print("-" * 80)
-    print("🏁 Azure SQL Data Correction Complete!")
+    print("🏁 PostgreSQL Data Correction Complete!")
 
 if __name__ == "__main__":
-    update_azure_data()
+    update_postgres_data()

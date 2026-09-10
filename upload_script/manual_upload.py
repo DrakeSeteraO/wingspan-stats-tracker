@@ -1,25 +1,23 @@
 import os
-import pyodbc
+import psycopg2
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
 
-# --- Azure SQL Configuration ---
+# --- PostgreSQL Configuration ---
 load_dotenv()
 SERVER = os.getenv('SERVER')
-DATABASE = os.getenv('DATABASE')
+DATABASE = os.getenv('DATABASE', 'wingspan_db')
 USERNAME = os.getenv('UPLOAD_USERNAME') # You can swap this to API_USERNAME if needed
 PASSWORD = os.getenv('UPLOAD_PASSWORD')
-DRIVER = os.getenv('DRIVER', '{ODBC Driver 17 for SQL Server}')
 
 def get_db_connection():
-    """Establish a connection to the Azure SQL Database."""
-    conn_str = f"DRIVER={DRIVER};SERVER={SERVER};PORT=1433;DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD}"
-    return pyodbc.connect(conn_str, autocommit=False)
+    """Establish a connection to the PostgreSQL Database."""
+    return psycopg2.connect(host=SERVER, dbname=DATABASE, user=USERNAME, password=PASSWORD)
 
 def get_or_create_player(cursor, name):
     """Retrieve an existing player_id or create a new one."""
-    cursor.execute("SELECT player_id FROM player_info WHERE name = ?", (name,))
+    cursor.execute("SELECT player_id FROM player_info WHERE name = %s", (name,))
     row = cursor.fetchone()
     if row:
         return row[0]
@@ -28,7 +26,7 @@ def get_or_create_player(cursor, name):
     new_id = str(uuid.uuid4())
     cursor.execute("""
         INSERT INTO player_info (player_id, name, username) 
-        VALUES (?, ?, ?)
+        VALUES (%s, %s, %s)
     """, (new_id, name, name))
     return new_id
 
@@ -44,12 +42,12 @@ def prompt_int(prompt_text):
         return 0
 
 def main():
-    print("🔌 Connecting to Azure SQL...")
+    print("🔌 Connecting to PostgreSQL...")
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         print("✅ Connected successfully!\n")
-    except pyodbc.Error as e:
+    except Exception as e:
         print(f"❌ Database connection failed: {e}")
         return
 
@@ -113,7 +111,7 @@ def main():
             # 1. Insert Core Game Record
             cursor.execute("""
                 INSERT INTO game (game_id, date, player_count, winner_id) 
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
             """, (game_id, game_date, num_players, winner_id))
 
             # 2. Insert Player Stats
@@ -121,7 +119,7 @@ def main():
                 cursor.execute("""
                     INSERT INTO player_game_stats 
                     (player_id, game_id, total, bird, bonus_card, end_of_round_goals, eggs, food_on_cards, tucked_cards, nectar) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (p['player_id'], game_id, p['total'], p['bird'], p['bonus'], p['eor'], p['eggs'], p['food'], p['tucked'], p['nectar']))
             
             # Commit the transaction to save this specific game
