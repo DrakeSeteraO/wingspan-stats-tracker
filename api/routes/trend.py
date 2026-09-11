@@ -32,7 +32,8 @@ def get_stats(request: TrendRequest):
         'eggs': 'eggs',
         'food': 'food_on_cards',
         'tucked': 'tucked_cards',
-        'nectar': 'nectar'
+        'nectar': 'nectar',
+        'wins': 'wins'
     }
 
     allowed_handlers = {
@@ -68,6 +69,16 @@ def get_stats(request: TrendRequest):
     else:
         safe_select_interval = safe_group_interval
 
+    # --- Determine Table Source ---
+    if safe_score == 'wins':
+        table_source = """(
+            SELECT *, 
+                   CASE WHEN RANK() OVER(PARTITION BY game_id ORDER BY total DESC) = 1 THEN 1 ELSE 0 END AS wins 
+            FROM player_game_stats
+        ) s"""
+    else:
+        table_source = "player_game_stats s"
+    
     # Construct the Dynamic Query and Conditional WHERE Clause
     where_clause = ""
     query_params = ()
@@ -84,13 +95,13 @@ def get_stats(request: TrendRequest):
         group_by_clause = f"GROUP BY {safe_group_interval}, p.username, p.name"
         order_by_clause = "ORDER BY time_interval"
     
-    sql_query = f"""
+        sql_query = f"""
         SELECT 
             {safe_select_interval} AS time_interval,
             p.username,
             p.name,
             {safe_handler}(s.{safe_score}) AS calculated_score
-        FROM player_game_stats s
+        FROM {table_source}
         JOIN game g ON s.game_id = g.game_id
         JOIN player_info p ON s.player_id = p.player_id
         {where_clause}

@@ -49,6 +49,7 @@ const scoreOptions = [
   { value: "food", label: "Food on Cards" },
   { value: "tucked", label: "Tucked Cards" },
   { value: "nectar", label: "Nectar" },
+  { value: "wins", label: "Wins"},
 ];
 
 const intervalOptions = [
