@@ -22,6 +22,7 @@ class PlayerStat(BaseModel):
     food: Optional[float] = None
     tucked: Optional[float] = None
     nectar: Optional[float] = None
+    wins: Optional[float] = None
 
 
 class TrendRecord(BaseModel):
