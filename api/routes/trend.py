@@ -70,6 +70,7 @@ def get_stats(request: TrendRequest):
     else:
         safe_select_interval = safe_group_interval
 
+    
     # --- Determine Table Source ---
     if safe_score == 'wins':
         table_source = """(
@@ -79,7 +80,7 @@ def get_stats(request: TrendRequest):
         ) s"""
     else:
         table_source = "player_game_stats s"
-    
+        
     # Construct the Dynamic Query and Conditional WHERE Clause
     where_clause = ""
     query_params = ()
@@ -97,18 +98,18 @@ def get_stats(request: TrendRequest):
         order_by_clause = "ORDER BY time_interval"
     
     sql_query = f"""
-    SELECT 
-        {safe_select_interval} AS time_interval,
-        p.username,
-        p.name,
-        {safe_handler}(s.{safe_score}) AS calculated_score
-    FROM {table_source}
-    JOIN game g ON s.game_id = g.game_id
-    JOIN player_info p ON s.player_id = p.player_id
-    {where_clause}
-    {group_by_clause}
-    {order_by_clause};
-"""
+        SELECT 
+            {safe_select_interval} AS time_interval,
+            p.username,
+            p.name,
+            {safe_handler}(s.{safe_score}) AS calculated_score
+        FROM {table_source}
+        JOIN game g ON s.game_id = g.game_id
+        JOIN player_info p ON s.player_id = p.player_id
+        {where_clause}
+        {group_by_clause}
+        {order_by_clause};
+    """
 
     try:
         conn = psycopg2.connect(host=SERVER, user=USERNAME, password=PASSWORD, dbname=DATABASE)
@@ -126,11 +127,10 @@ def get_stats(request: TrendRequest):
         # --- Reformat Data for Frontend Graph ---
         formatted_dict = {}
         
-        # Revert the .lower() from request.score so it matches the React dropdown exactly
         metric_key = 'totalPoints' if request.score.lower() == 'total' else request.score
         
-        # Force cumulative tracking for wins, regardless of what handler the frontend asks for
-        is_cumulative = request.handler.lower() == 'cumulative' or request.score.lower() == 'wins'
+        # Track if we need running totals
+        is_cumulative = request.handler.lower() == 'cumulative'
         running_totals = {}
         
         for row in results:
@@ -147,20 +147,18 @@ def get_stats(request: TrendRequest):
             score = row['calculated_score'] if row['calculated_score'] is not None else 0
             player_name = row['name'] 
             
-            # Apply cumulative math 
+            # Apply cumulative math if requested
             if is_cumulative:
                 running_totals[player_name] = running_totals.get(player_name, 0) + score
                 display_score = running_totals[player_name]
             else:
                 display_score = score
             
-            # Append the calculated display_score
             formatted_dict[interval]["results"].append({
                 "player": player_name,
                 metric_key: display_score
             })
             
-            # Evaluate the winner based on the display score
             if display_score > formatted_dict[interval]["_max_score"]:
                 formatted_dict[interval]["_max_score"] = display_score
                 formatted_dict[interval]["winner"] = player_name
@@ -169,6 +167,7 @@ def get_stats(request: TrendRequest):
         
         for index, (_, data) in enumerate(formatted_dict.items(), start=1):
             del data["_max_score"]
+            
             final_output.append({
                 "id": index,
                 **data

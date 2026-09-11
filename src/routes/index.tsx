@@ -66,6 +66,7 @@ const handlerOptions = [
   { value: "avg", label: "Avg" },
   { value: "max", label: "Max" },
   { value: "min", label: "Min" },
+  { value: "cumulative", label: "Cumulative" },
 ];
 
 function formatDate(iso: string) {
