@@ -126,8 +126,8 @@ def get_stats(request: TrendRequest):
         # --- Reformat Data for Frontend Graph ---
         formatted_dict = {}
         
-        # Force the metric key to lowercase so React/Recharts can always find the data
-        metric_key = 'totalPoints' if request.score.lower() == 'total' else request.score.lower()
+        # Revert the .lower() from request.score so it matches the React dropdown exactly
+        metric_key = 'totalPoints' if request.score.lower() == 'total' else request.score
         
         # Force cumulative tracking for wins, regardless of what handler the frontend asks for
         is_cumulative = request.handler.lower() == 'cumulative' or request.score.lower() == 'wins'
